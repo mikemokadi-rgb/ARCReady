@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARCReady — Audit. Risk. Compliance.</title>
+<meta name="description" content="ARCReady helps organisations worldwide assess and strengthen their audit, risk, and compliance posture — so you're never caught off guard.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Montserrat:wght@400;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,600;1,400;1,600&display=swap" rel="stylesheet">
+<style>
+
+/* ══════════════════════════════════════════════════════════
+   DESIGN TOKENS
+══════════════════════════════════════════════════════════ */
+:root {
+  --royal:       #1B3461;
+  --royal-deep:  #0E1F3D;
+  --royal-mid:   #224080;
+  --royal-light: #2B508A;
+  --gold:        #A4844A;
+  --gold-light:  #BFA06A;
+  --gold-pale:   #DEC898;
+  --gold-muted:  #78612E;
+  --cream:       #F3EDE2;
+  --cream-deep:  #E8DFD0;
+  --off-white:   #F8F5F0;
+  --page-bg:     #F3EDE2;
+  --ink:         #0E1A26;
+  --ink-mid:     #2C3240;
+  --ink-light:   #5C6070;
+  --nav-h:       88px;
+}
+
+/* ══════════════════════════════════════════════════════════
+   SCROLL PROGRESS
+══════════════════════════════════════════════════════════ */
+#scroll-progress {
+  position: fixed; top: 0; left: 0; z-index: 2000;
+  height: 2px; width: 0%;
+  background: linear-gradient(90deg, var(--gold-muted), var(--gold), var(--gold-light));
+  transition: width 0.1s linear;
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════════════════
+   RESET & BASE
+══════════════════════════════════════════════════════════ */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { background: var(--page-bg); font-family: 'Inter', sans-serif; color: var(--ink); overflow-x: hidden; }
+img { display: block; max-width: 100%; }
+a { text-decoration: none; }
+button { cursor: pointer; border: none; background: none; font-family: inherit; }
+ul { list-style: none; }
+
+/* ── Focus-visible global ── */
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+a:focus-visible, button:focus-visible { outline-offset: 4px; }
+
+/* ── Active state global ── */
+.btn:active { transform: scale(0.97) translateY(0) !important; }
+.nav-cta-btn:active, .btn-ghost-gold:active, .btn-ghost-dark:active { opacity: 0.75; }
+
+/* ══════════════════════════════════════════════════════════
+   UTILITY
+══════════════════════════════════════════════════════════ */
+.container { width: min(1160px, 92%); margin-inline: auto; }
+
+.eyebrow {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.38em;
+  text-transform: uppercase;
+  color: var(--gold-muted);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.eyebrow::after { content: ''; width: 36px; height: 1px; background: var(--gold); opacity: 0.55; }
+.eyebrow--light { color: var(--gold-light); }
+.eyebrow--light::after { background: var(--gold-light); opacity: 0.7; }
+.eyebrow--center { justify-content: center; }
+
+.section-title {
+  font-family: 'Montserrat', sans-serif;
+  font-size: clamp(28px, 3.4vw, 42px);
+  font-weight: 900;
+  text-transform: uppercase;
+  color: var(--royal);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  margin-bottom: 16px;
+}
+.section-title--light { color: white; }
+
+.section-sub {
+  font-family: 'Playfair Display', serif;
+  font-size: 19px;
+  font-style: italic;
+  color: var(--ink-light);
+  line-height: 1.65;
+  max-width: 580px;
+}
+.section-sub--light { color: rgba(255,255,255,0.45); }
+.section-sub--center { margin-inline: auto; text-align: center; }
+
+.ornament {
+  display: flex; align-items: center; gap: 12px;
+  margin: 16px 0 28px;
+}
+.ornament-line { height: 1px; background: var(--gold); opacity: 0.28; flex: 1; max-width: 56px; }
+.ornament-diamond { width: 5px; height: 5px; background: var(--gold); transform: rotate(45deg); opacity: 0.45; }
+
+/* Scroll-reveal */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal.visible { opacity: 1; transform: none; }
+.d1 { transition-delay: 0.08s; }
+.d2 { transition-delay: 0.18s; }
+.d3 { transition-delay: 0.28s; }
+.d4 { transition-delay: 0.38s; }
+
+/* ══════════════════════════════════════════════════════════
+   BUTTONS
+══════════════════════════════════════════════════════════ */
+.btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 500;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  padding: 14px 32px; cursor: pointer;
+  transition: background 0.22s ease, color 0.22s ease,
+              transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.22s ease, border-color 0.22s ease;
+  border: none;
+}
+.btn-gold   { background: var(--gold); color: white; box-shadow: 0 2px 8px rgba(164,132,74,0.28), 0 6px 20px rgba(164,132,74,0.14); }
+.btn-gold:hover   { background: var(--gold-light); transform: translateY(-3px); box-shadow: 0 4px 14px rgba(164,132,74,0.36), 0 10px 28px rgba(164,132,74,0.2); }
+.btn-royal  { background: var(--royal); color: white; border-bottom: 2px solid var(--gold-muted); box-shadow: 0 2px 8px rgba(14,31,61,0.28), 0 6px 20px rgba(14,31,61,0.14); }
+.btn-royal:hover  { background: var(--royal-light); border-bottom-color: var(--gold-light); transform: translateY(-3px); box-shadow: 0 4px 14px rgba(14,31,61,0.36), 0 10px 28px rgba(14,31,61,0.2); }
+.btn-outline { background: transparent; color: var(--royal); border: 1.5px solid var(--royal); transition: background 0.22s ease, color 0.22s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.btn-outline:hover { background: var(--royal); color: white; transform: translateY(-2px); }
+.btn-ghost-dark {
+  background: transparent; color: rgba(255,255,255,0.55);
+  font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 400;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  padding: 14px 0; border: none; border-bottom: 1px solid rgba(255,255,255,0.18);
+  transition: color 0.22s ease, border-color 0.22s ease; cursor: pointer;
+}
+.btn-ghost-dark:hover { color: rgba(255,255,255,0.9); border-bottom-color: var(--gold); }
+.btn-ghost-gold {
+  background: transparent; color: var(--gold-muted);
+  font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 500;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  padding: 12px 0; border: none; border-bottom: 1px solid var(--gold);
+  transition: color 0.22s ease, gap 0.22s ease; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.btn-ghost-gold:hover { color: var(--gold); gap: 14px; }
+
+/* ══════════════════════════════════════════════════════════
+   NAVIGATION
+══════════════════════════════════════════════════════════ */
+#navbar {
+  position: fixed; top: 2px; left: 0; right: 0; z-index: 1000;
+  background: var(--royal-deep);
+  border-bottom: 1px solid rgba(176,144,80,0.14);
+  height: var(--nav-h);
+  transition: background 0.35s ease, box-shadow 0.35s ease, backdrop-filter 0.35s ease;
+}
+#navbar.scrolled {
+  background: rgba(12,26,54,0.96);
+  box-shadow: 0 1px 0 rgba(176,144,80,0.08), 0 4px 24px rgba(0,0,0,0.28), 0 16px 40px rgba(0,0,0,0.12);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.nav-inner {
+  height: 100%; display: flex; align-items: center;
+  justify-content: space-between;
+}
+.nav-logo { display: flex; align-items: center; gap: 12px; }
+.nav-wordmark { display: flex; flex-direction: column; line-height: 1; }
+.nav-wordmark-name { font-family: 'Montserrat', sans-serif; font-size: 18px; font-weight: 900; text-transform: uppercase; color: #fff; letter-spacing: 0.06em; }
+.nav-wordmark-sub { font-family: 'Inter', sans-serif; font-size: 7px; font-weight: 400; letter-spacing: 0.34em; color: var(--gold-light); text-transform: uppercase; margin-top: 3px; }
+.nav-links { display: flex; align-items: center; gap: 34px; }
+.nav-links a {
+  font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 400;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: rgba(255,255,255,0.5); transition: color 0.2s;
+  position: relative; padding-bottom: 3px;
+}
+.nav-links a::after {
+  content: ''; position: absolute; bottom: -2px; left: 0;
+  width: 0; height: 1px; background: var(--gold-light); transition: width 0.25s;
+}
+.nav-links a:hover, .nav-links a.active { color: var(--gold-light); }
+.nav-links a:hover::after, .nav-links a.active::after { width: 100%; }
+.nav-cta-btn {
+  font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 500;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--gold-light); padding: 9px 22px;
+  border: 1px solid rgba(176,144,80,0.45);
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease; cursor: pointer; background: transparent;
+}
+.nav-cta-btn:hover { background: var(--gold); color: white; border-color: var(--gold); }
+.hamburger { display: none; flex-direction: column; gap: 5px; padding: 8px; }
+.hamburger span { display: block; width: 23px; height: 1.5px; background: var(--gold-light); transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease; }
+.mobile-nav {
+  display: none; position: fixed; top: var(--nav-h); left: 0; right: 0; z-index: 999;
+  background: rgba(15,32,64,0.98); border-bottom: 2px solid rgba(176,144,80,0.3);
+  padding: 28px 24px; flex-direction: column; gap: 22px;
+}
+.mobile-nav.open { display: flex; }
+.mobile-nav a {
+  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 400;
+  letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.55);
+}
+.mobile-nav a:hover { color: var(--gold-light); }
+
+/* ══════════════════════════════════════════════════════════
+   HERO
+══════════════════════════════════════════════════════════ */
+
+/* SVG grain filter for texture */
+.grain-filter { position: absolute; width: 0; height: 0; pointer-events: none; }
+
+@keyframes ring-breathe {
+  0%, 100% { opacity: 0.07; transform: translate(-50%, -50%) scale(1); }
+  50%       { opacity: 0.13; transform: translate(-50%, -50%) scale(1.025); }
+}
+@keyframes ring-breathe-2 {
+  0%, 100% { opacity: 0.055; transform: translate(-50%, -50%) scale(1); }
+  50%       { opacity: 0.10; transform: translate(-50%, -50%) scale(1.018); }
+}
+@keyframes ring-breathe-3 {
+  0%, 100% { opacity: 0.04; transform: translate(-50%, -50%) scale(1); }
+  50%       { opacity: 0.08; transform: translate(-50%, -50%) scale(1.012); }
+}
+@keyframes mark-appear {
+  0%   { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+#home {
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse 60% 70% at 72% 50%, rgba(164,132,74,0.09) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 60% at 20% 80%, rgba(27,52,97,0.7) 0%, transparent 70%),
+    radial-gradient(ellipse 80% 100% at 50% 0%, rgba(20,40,80,0.5) 0%, transparent 60%),
+    var(--royal-deep);
+  display: flex; align-items: center;
+  position: relative; overflow: hidden;
+  padding-top: var(--nav-h);
+}
+#home::after {
+  content: '';
+  position: absolute; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  opacity: 0.025;
+  pointer-events: none;
+}
+.hero-arcs {
+  position: absolute; right: -80px; top: 50%; transform: translateY(-50%);
+  width: 680px; height: 680px; pointer-events: none;
+}
+.hero-rule {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent 0%, rgba(164,132,74,0.12) 10%, rgba(164,132,74,0.55) 30%, var(--gold) 50%, rgba(164,132,74,0.55) 70%, rgba(164,132,74,0.12) 90%, transparent 100%);
+}
+.hero-inner {
+  position: relative; z-index: 2;
+  display: grid; grid-template-columns: 1fr 1fr;
+  align-items: center; gap: 64px;
+  padding: 100px 0 110px;
+}
+.hero-eyebrow {
+  font-family: 'Inter', sans-serif; font-size: 9px; font-weight: 600;
+  letter-spacing: 0.42em; text-transform: uppercase; color: var(--gold-light);
+  display: flex; align-items: center; gap: 16px;
+  margin-bottom: 26px;
+}
+.hero-eyebrow::before { content: ''; width: 30px; height: 1px; background: var(--gold); }
+.hero-headline {
+  font-family: 'Montserrat', sans-serif;
+  font-size: clamp(38px, 5.2vw, 62px);
+  font-weight: 900;
+  text-transform: uppercase;
+  color: #fff; line-height: 1.05; letter-spacing: -0.03em; margin-bottom: 24px;
+}
+.hero-headline em { font-style: normal; color: var(--gold-light); }
+.hero-sub {
+  font-family: 'Playfair Display', serif; font-size: 19px; font-style: italic;
+  color: rgba(255,255,255,0.5); line-height: 1.7; margin-bottom: 40px; max-width: 480px;
+}
+.hero-actions { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; margin-bottom: 60px; }
+.hero-trust {
+  padding-top: 36px; border-top: 1px solid rgba(255,255,255,0.07);
+  display: flex; flex-wrap: wrap; gap: 0;
+}
+.trust-pill {
+  display: flex; align-items: center; gap: 9px;
+  padding: 0 28px 0 0; margin-right: 28px;
+  border-right: 1px solid rgba(176,144,80,0.18);
+}
+.trust-pill:last-child { border-right: none; margin-right: 0; padding-right: 0; }
+.trust-dot { width: 4px; height: 4px; background: var(--gold); border-radius: 50%; flex-shrink: 0; }
+.trust-label { font-family: 'Inter', sans-serif; font-size: 9.5px; font-weight: 400; letter-spacing: 0.16em; color: rgba(255,255,255,0.36); text-transform: uppercase; }
+
+/* Hero visual */
+.hero-visual { display: flex; justify-content: center; align-items: center; }
+.hero-logo-frame { position: relative; display: flex; flex-direction: column; align-items: center; gap: 28px; }
+.ring {
+  position: absolute; border-radius: 50%;
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.ring-1 { width: 380px; height: 380px; border: 1px solid rgba(176,144,80,0.1); animation: ring-breathe   7s ease-in-out infinite; }
+.ring-2 { width: 290px; height: 290px; border: 1px solid rgba(176,144,80,0.07); animation: ring-breathe-2 7s ease-in-out infinite 0.8s; }
+.ring-3 { width: 200px; height: 200px; border: 1px solid rgba(176,144,80,0.05); animation: ring-breathe-3 7s ease-in-out infinite 1.6s; }
+.hero-mark {
+  position: relative; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; gap: 22px;
+  animation: mark-appear 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.hero-mark-name { font-family: 'Montserrat', sans-serif; font-size: 34px; font-weight: 900; text-transform: uppercase; color: white; letter-spacing: 0.06em; }
+.hero-mark-tag { font-family: 'Inter', sans-serif; font-size: 8px; font-weight: 400; letter-spacing: 0.44em; color: var(--gold-light); text-transform: uppercase; }
+
+/* ══════════════════════════════════════════════════════════
+   VALUE PROPOSITION
+══════════════════════════════════════════════════════════ */
+#value-prop { background: var(--off-white); padding: 120px 0; }
+.value-header { text-align: center; margin-bottom: 72px; }
+.value-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+.value-card {
+  background: white; padding: 52px 40px; position: relative;
+  border-bottom: 3px solid transparent;
+  box-shadow: 0 1px 3px rgba(14,31,61,0.06), 0 4px 12px rgba(14,31,61,0.04);
+  transition: border-color 0.25s ease,
+              transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.3s ease;
+}
+.value-card:hover {
+  border-bottom-color: var(--gold);
+  transform: translateY(-6px);
+  box-shadow: 0 2px 4px rgba(14,31,61,0.08), 0 8px 20px rgba(14,31,61,0.07), 0 20px 48px rgba(14,31,61,0.06), 0 0 0 1px rgba(164,132,74,0.08);
+}
+.value-card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: linear-gradient(90deg, var(--gold-muted), var(--gold-light)); opacity: 0; transition: opacity 0.25s ease; }
+.value-card:hover::before { opacity: 1; }
+.val-number { font-family: 'Montserrat', sans-serif; font-size: 52px; color: var(--cream-deep); line-height: 1; margin-bottom: 22px; }
+.val-title { font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--royal); margin-bottom: 14px; }
+.val-body { font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 300; color: var(--ink-mid); line-height: 1.82; }
+
+/* ══════════════════════════════════════════════════════════
+   HOW IT WORKS
+══════════════════════════════════════════════════════════ */
+#how-it-works {
+  background:
+    radial-gradient(ellipse 70% 60% at 85% 50%, rgba(164,132,74,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 80% at 10% 80%, rgba(34,64,128,0.4) 0%, transparent 60%),
+    var(--royal-deep);
+  padding: 120px 0; position: relative; overflow: hidden;
+}
+.hiw-deco { position: absolute; pointer-events: none; border-radius: 50%; border: 1px solid rgba(176,144,80,0.05); }
+.hiw-deco-1 { width: 600px; height: 600px; right: -180px; bottom: -180px; }
+.hiw-deco-2 { width: 400px; height: 400px; right: -100px; bottom: -100px; }
+.hiw-header { text-align: center; margin-bottom: 80px; }
+.hiw-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; position: relative; z-index: 1; }
+.hiw-card {
+  background: rgba(255,255,255,0.025); border: 1px solid rgba(176,144,80,0.08);
+  padding: 52px 30px 44px; text-align: center;
+  transition: background 0.25s ease, border-color 0.25s ease,
+              transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.3s ease;
+}
+.hiw-card:hover {
+  background: rgba(255,255,255,0.05); border-color: rgba(176,144,80,0.28);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.22), 0 0 0 1px rgba(176,144,80,0.1);
+}
+.hiw-num {
+  width: 52px; height: 52px; border: 1px solid var(--gold-muted); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 28px; background: var(--royal-deep);
+  font-family: 'Montserrat', sans-serif; font-size: 16px; font-weight: 800; color: var(--gold-light);
+}
+.hiw-title { font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: white; margin-bottom: 14px; }
+.hiw-body { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 300; color: rgba(255,255,255,0.38); line-height: 1.78; }
+
+/* ══════════════════════════════════════════════════════════
+   TRUST BAR
+══════════════════════════════════════════════════════════ */
+#trust-bar { background: var(--royal); border-top: 1px solid rgba(176,144,80,0.18); border-bottom: 1px solid rgba(176,144,80,0.18); }
+.trust-bar-inner { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; }
+.trust-bar-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 28px 44px; border-right: 1px solid rgba(176,144,80,0.12);
+}
+.trust-bar-item:last-child { border-right: none; }
+.trust-bar-icon { color: var(--gold-light); flex-shrink: 0; }
+.trust-bar-text { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 400; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.55); }
+
+/* ══════════════════════════════════════════════════════════
+   SERVICES
+══════════════════════════════════════════════════════════ */
+#services { background: var(--page-bg); padding: 120px 0; }
+.services-header { margin-bottom: 72px; }
+.services-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: start; }
+.svc-card {
+  background: white; border: 1px solid var(--cream-deep); position: relative;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(14,31,61,0.06), 0 4px 10px rgba(14,31,61,0.04);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, border-color 0.25s ease;
+}
+.svc-card:hover {
+  transform: translateY(-7px);
+  box-shadow: 0 2px 6px rgba(14,31,61,0.08), 0 8px 24px rgba(14,31,61,0.08), 0 24px 56px rgba(14,31,61,0.07), 0 0 0 1px rgba(164,132,74,0.1);
+  border-color: rgba(164,132,74,0.2);
+}
+.svc-card-head { padding: 36px 36px 28px; border-bottom: 1px solid var(--cream-deep); position: relative; }
+.svc-card--feat .svc-card-head { background: var(--royal); }
+.svc-popular {
+  position: absolute; top: 0; right: 0;
+  background: var(--gold); color: white;
+  font-family: 'Inter', sans-serif; font-size: 8px; font-weight: 600;
+  letter-spacing: 0.25em; text-transform: uppercase; padding: 5px 14px;
+}
+.svc-tier { font-family: 'Inter', sans-serif; font-size: 9px; font-weight: 600; letter-spacing: 0.35em; text-transform: uppercase; color: var(--gold-muted); margin-bottom: 10px; }
+.svc-card--feat .svc-tier { color: var(--gold-light); }
+.svc-name { font-family: 'Montserrat', sans-serif; font-size: 22px; font-weight: 900; text-transform: uppercase; color: var(--royal); letter-spacing: -0.01em; line-height: 1.15; }
+.svc-card--feat .svc-name { color: white; letter-spacing: -0.01em; }
+.svc-ideal { font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 300; color: var(--ink-light); margin-top: 8px; font-style: italic; }
+.svc-card--feat .svc-ideal { color: rgba(255,255,255,0.42); }
+.svc-card-body { padding: 32px 36px 40px; }
+.svc-includes { font-family: 'Inter', sans-serif; font-size: 9px; font-weight: 600; letter-spacing: 0.3em; text-transform: uppercase; color: var(--gold-muted); margin-bottom: 16px; }
+.svc-features { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+.svc-feature { display: flex; align-items: flex-start; gap: 12px; }
+.svc-dot { width: 4px; height: 4px; background: var(--gold); border-radius: 50%; margin-top: 7px; flex-shrink: 0; }
+.svc-feat-text { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 300; color: var(--ink-mid); line-height: 1.62; }
+.svc-callout { background: var(--cream); border-left: 3px solid var(--gold); padding: 14px 18px; margin: 18px 0 28px; }
+.svc-callout-text { font-family: 'Playfair Display', serif; font-size: 14px; font-style: italic; color: var(--ink-mid); line-height: 1.58; }
+.services-cta { text-align: center; margin-top: 60px; }
+.services-cta-note { font-family: 'Playfair Display', serif; font-size: 18px; font-style: italic; color: var(--ink-light); margin-bottom: 22px; }
+
+/* ══════════════════════════════════════════════════════════
+   CTA BANNER
+══════════════════════════════════════════════════════════ */
+#cta-banner {
+  background:
+    radial-gradient(ellipse 60% 80% at 50% 50%, rgba(164,132,74,0.1) 0%, transparent 70%),
+    radial-gradient(ellipse 100% 100% at 0% 100%, rgba(14,31,61,0.5) 0%, transparent 60%),
+    var(--royal);
+  padding: 88px 0; position: relative; overflow: hidden;
+}
+.cta-deco { position: absolute; pointer-events: none; border-radius: 50%; }
+.cta-deco-1 { width: 520px; height: 520px; right: -100px; top: 50%; transform: translateY(-50%); border: 1px solid rgba(176,144,80,0.07); }
+.cta-deco-2 { width: 330px; height: 330px; right: 20px;  top: 50%; transform: translateY(-50%); border: 1px solid rgba(176,144,80,0.05); }
+.cta-inner { position: relative; z-index: 1; text-align: center; }
+.cta-title { font-family: 'Montserrat', sans-serif; font-size: clamp(26px, 3.2vw, 40px); font-weight: 900; text-transform: uppercase; color: white; letter-spacing: -0.015em; margin-bottom: 16px; }
+.cta-sub { font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 300; color: rgba(255,255,255,0.5); letter-spacing: 0.03em; margin-bottom: 38px; max-width: 500px; margin-inline: auto; line-height: 1.72; }
+
+/* ══════════════════════════════════════════════════════════
+   ABOUT
+══════════════════════════════════════════════════════════ */
+#about { background: var(--cream); padding: 120px 0; }
+.about-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 88px; align-items: start; }
+.about-body { font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 300; color: var(--ink-mid); line-height: 1.88; margin-bottom: 36px; }
+.founder-card { background: white; border: 1px solid var(--cream-deep); padding: 40px 40px 36px; position: relative; }
+.founder-card::before { content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%; background: var(--gold); }
+.founder-avatar { width: 68px; height: 68px; border-radius: 50%; background: var(--royal-deep); border: 2px solid rgba(176,144,80,0.22); display: flex; align-items: center; justify-content: center; margin-bottom: 20px; }
+.founder-name { font-family: 'Montserrat', sans-serif; font-size: 18px; font-weight: 800; text-transform: uppercase; color: var(--royal); letter-spacing: 0.04em; margin-bottom: 5px; }
+.founder-role { font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 500; letter-spacing: 0.24em; text-transform: uppercase; color: var(--gold-muted); margin-bottom: 18px; }
+.founder-bio { font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 300; color: var(--ink-mid); line-height: 1.82; margin-bottom: 22px; }
+.tag-row { display: flex; flex-wrap: wrap; gap: 7px; }
+.tag { font-family: 'Inter', sans-serif; font-size: 9px; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; padding: 5px 12px; border-radius: 2px; }
+.tag-r  { background: var(--royal); color: white; }
+.tag-g  { background: var(--gold-pale); color: var(--gold-muted); border: 1px solid rgba(176,144,80,0.3); }
+.tag-o  { background: transparent; color: var(--royal); border: 1px solid var(--royal); }
+
+/* Values panel */
+.values-title { font-family: 'Montserrat', sans-serif; font-size: 26px; font-weight: 900; text-transform: uppercase; color: var(--royal); letter-spacing: -0.01em; margin-bottom: 36px; }
+.value-items { display: flex; flex-direction: column; }
+.vi { display: flex; align-items: flex-start; gap: 20px; padding: 28px 0; border-bottom: 1px solid var(--cream-deep); }
+.vi:last-child { border-bottom: none; }
+.vi-icon { width: 36px; height: 36px; background: var(--royal-deep); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+.vi-name { font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--royal); margin-bottom: 8px; }
+.vi-body { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 300; color: var(--ink-mid); line-height: 1.76; }
+
+/* ══════════════════════════════════════════════════════════
+   CONTACT
+══════════════════════════════════════════════════════════ */
+#contact {
+  background:
+    radial-gradient(ellipse 70% 60% at 15% 50%, rgba(34,64,128,0.5) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 70% at 85% 80%, rgba(164,132,74,0.06) 0%, transparent 55%),
+    var(--royal-deep);
+  padding: 120px 0; position: relative; overflow: hidden;
+}
+.contact-deco { position: absolute; pointer-events: none; border-radius: 50%; border: 1px solid rgba(176,144,80,0.05); }
+.contact-deco-1 { width: 640px; height: 640px; left: -200px; top: -160px; }
+.contact-deco-2 { width: 420px; height: 420px; left: -110px; top: -80px; }
+.contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; position: relative; z-index: 1; }
+.contact-title { font-family: 'Montserrat', sans-serif; font-size: clamp(26px, 3.1vw, 38px); font-weight: 900; text-transform: uppercase; color: white; letter-spacing: -0.015em; line-height: 1.1; margin-bottom: 18px; }
+.contact-sub { font-family: 'Playfair Display', serif; font-size: 17px; font-style: italic; color: rgba(255,255,255,0.42); line-height: 1.72; margin-bottom: 48px; }
+.contact-options { display: flex; flex-direction: column; }
+.co { display: flex; align-items: flex-start; gap: 20px; padding: 28px 0; border-bottom: 1px solid rgba(176,144,80,0.1); }
+.co:last-child { border-bottom: none; }
+.co-icon { width: 40px; height: 40px; border: 1px solid rgba(176,144,80,0.22); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--gold-light); }
+.co-title { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: white; margin-bottom: 6px; }
+.co-text { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 300; color: rgba(255,255,255,0.38); line-height: 1.65; margin-bottom: 10px; }
+.co-link { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 500; letter-spacing: 0.15em; color: var(--gold-light); text-transform: uppercase; display: inline-flex; align-items: center; gap: 8px; transition: gap 0.2s; }
+.co-link:hover { gap: 14px; }
+
+/* Form */
+.form-wrap { background: rgba(255,255,255,0.03); border: 1px solid rgba(176,144,80,0.12); padding: 48px 44px; }
+.form-title { font-family: 'Montserrat', sans-serif; font-size: 22px; color: white; letter-spacing: 0.06em; margin-bottom: 28px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.fg { display: flex; flex-direction: column; gap: 7px; }
+.fg.full { grid-column: 1 / -1; }
+.fl { font-family: 'Inter', sans-serif; font-size: 9px; font-weight: 600; letter-spacing: 0.28em; text-transform: uppercase; color: var(--gold-muted); }
+.fi, .fs, .ft {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(176,144,80,0.14);
+  color: white; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 300;
+  padding: 12px 16px; outline: none;
+  transition: border-color 0.22s ease, background 0.22s ease, box-shadow 0.22s ease;
+  width: 100%;
+}
+.fi::placeholder, .ft::placeholder { color: rgba(255,255,255,0.18); }
+.fi:focus, .fs:focus, .ft:focus {
+  border-color: rgba(176,144,80,0.5);
+  background: rgba(255,255,255,0.065);
+  box-shadow: 0 0 0 3px rgba(164,132,74,0.1), inset 0 1px 3px rgba(0,0,0,0.1);
+}
+.fi:hover, .ft:hover { border-color: rgba(176,144,80,0.28); }
+.fs {
+  appearance: none; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7' viewBox='0 0 12 7'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23B09050' stroke-width='1.4' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center; background-color: rgba(255,255,255,0.04);
+  padding-right: 36px;
+}
+.fs option { background: var(--royal-deep); color: white; }
+.ft { resize: vertical; min-height: 100px; }
+
+/* ══════════════════════════════════════════════════════════
+   FOOTER
+══════════════════════════════════════════════════════════ */
+#footer { background: var(--ink); border-top: 3px solid var(--gold-muted); padding: 52px 0 36px; }
+.footer-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 28px; margin-bottom: 36px; padding-bottom: 32px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.footer-logo { display: flex; align-items: center; gap: 12px; }
+.footer-logo-name { font-family: 'Montserrat', sans-serif; font-size: 18px; font-weight: 900; text-transform: uppercase; color: white; letter-spacing: 0.06em; }
+.footer-logo-sub { font-family: 'Inter', sans-serif; font-size: 8px; font-weight: 300; letter-spacing: 0.28em; color: var(--gold-muted); text-transform: uppercase; margin-top: 3px; }
+.footer-nav { display: flex; gap: 32px; flex-wrap: wrap; }
+.footer-nav a { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(255,255,255,0.32); transition: color 0.2s; }
+.footer-nav a:hover { color: var(--gold-light); }
+.footer-email { font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 400; color: var(--gold-light); letter-spacing: 0.05em; }
+.footer-bottom { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.footer-copy { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 300; color: rgba(255,255,255,0.18); letter-spacing: 0.06em; }
+.footer-tagline { font-family: 'Playfair Display', serif; font-size: 13px; font-style: italic; color: rgba(255,255,255,0.14); }
+
+/* ══════════════════════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  .hero-inner { grid-template-columns: 1fr; padding: 80px 0 90px; }
+  .hero-visual { display: none; }
+  .hiw-steps { grid-template-columns: repeat(2, 1fr); }
+  .services-grid { grid-template-columns: 1fr; max-width: 520px; margin-inline: auto; }
+  .about-grid { grid-template-columns: 1fr; gap: 60px; }
+  .contact-grid { grid-template-columns: 1fr; gap: 60px; }
+}
+@media (max-width: 768px) {
+  .nav-links, .nav-cta-btn { display: none; }
+  .hamburger { display: flex; }
+  .value-grid { grid-template-columns: 1fr; }
+  .hiw-steps { grid-template-columns: 1fr; }
+  .trust-bar-inner { flex-direction: column; }
+  .trust-bar-item { border-right: none; border-bottom: 1px solid rgba(176,144,80,0.1); width: 100%; justify-content: center; }
+  .trust-bar-item:last-child { border-bottom: none; }
+  .form-grid { grid-template-columns: 1fr; }
+  .form-wrap { padding: 32px 24px; }
+  .footer-top { flex-direction: column; align-items: flex-start; }
+  .footer-nav { gap: 20px; }
+  .hero-trust { flex-direction: column; gap: 16px; }
+  .trust-pill { border-right: none; padding-right: 0; margin-right: 0; }
+  .footer-bottom { flex-direction: column; align-items: flex-start; }
+}
+
+</style>
+</head>
+<body>
+
+<!-- Scroll progress -->
+<div id="scroll-progress"></div>
+
+<!-- ══════════════════════════════════════════════════
+     NAVIGATION
+══════════════════════════════════════════════════ -->
+<nav id="navbar">
+  <div class="container">
+    <div class="nav-inner">
+
+      <!-- Logo -->
+      <a href="#home" class="nav-logo">
+        <!-- ARCReady V3 arch mark: gold on dark -->
+        <svg width="30" height="26" viewBox="0 0 56 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M23 2 L28 9 L33 2" fill="none" stroke="#BFA06A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="26.5" y1="10" x2="5"  y2="47" stroke="#BFA06A" stroke-width="5.5" stroke-linecap="square"/>
+          <line x1="29.5" y1="10" x2="51" y2="47" stroke="#BFA06A" stroke-width="5.5" stroke-linecap="square"/>
+          <line x1="13"   y1="29" x2="43" y2="29" stroke="#BFA06A" stroke-width="5.5" stroke-linecap="square"/>
+        </svg>
+        <div class="nav-wordmark">
+          <span class="nav-wordmark-name">ARCReady</span>
+          <span class="nav-wordmark-sub">Audit &middot; Risk &middot; Compliance</span>
+        </div>
+      </a>
+
+      <!-- Desktop links -->
+      <ul class="nav-links">
+        <li><a href="#home" class="active">Home</a></li>
+        <li><a href="#services">Services</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+
+      <button class="nav-cta-btn" onclick="scrollTo('contact')">Book a Call</button>
+      <button class="hamburger" id="hamburger" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<!-- Mobile nav -->
+<div class="mobile-nav" id="mobileNav">
+  <a href="#home" onclick="closeMobileNav()">Home</a>
+  <a href="#services" onclick="closeMobileNav()">Services</a>
+  <a href="#about" onclick="closeMobileNav()">About</a>
+  <a href="#contact" onclick="closeMobileNav()">Contact</a>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════
+     HERO
+══════════════════════════════════════════════════ -->
+<section id="home">
+
+  <!-- Decorative arc rings (top right) -->
+  <svg class="hero-arcs" viewBox="0 0 680 680" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="340" cy="340" r="330" stroke="#B09050" stroke-width="0.6" opacity="0.07"/>
+    <circle cx="340" cy="340" r="250" stroke="#B09050" stroke-width="0.6" opacity="0.055"/>
+    <circle cx="340" cy="340" r="170" stroke="#B09050" stroke-width="0.6" opacity="0.04"/>
+    <circle cx="340" cy="340" r="90"  stroke="#B09050" stroke-width="0.6" opacity="0.03"/>
+    <!-- Arc highlight -->
+    <path d="M340 10 A330 330 0 0 1 660 260" stroke="#C8A96A" stroke-width="1.2" opacity="0.11" fill="none"/>
+    <path d="M340 90 A250 250 0 0 1 580 260" stroke="#C8A96A" stroke-width="0.8" opacity="0.07" fill="none"/>
+  </svg>
+
+  <div class="hero-rule"></div>
+
+  <div class="container">
+    <div class="hero-inner">
+
+      <!-- Content -->
+      <div class="hero-content">
+        <div class="hero-eyebrow">GRC &amp; IT Audit Readiness Advisory &nbsp;&middot;&nbsp; Global Standards</div>
+        <h1 class="hero-headline">
+          Get <em>audit-ready</em><br>
+          before the<br>
+          auditors arrive.
+        </h1>
+        <p class="hero-sub">
+          ARCReady helps organisations worldwide assess and strengthen their audit, risk, and compliance posture — so you're never caught off guard.
+        </p>
+        <div class="hero-actions">
+          <a href="#contact" class="btn btn-gold">Book a Free Discovery Call</a>
+          <a href="#services" class="btn-ghost-dark">View Our Services &nbsp;&#8594;</a>
+        </div>
+        <div class="hero-trust">
+          <div class="trust-pill"><div class="trust-dot"></div><span class="trust-label">CA(SA) Qualified</span></div>
+          <div class="trust-pill"><div class="trust-dot"></div><span class="trust-label">COSO &amp; ISO 27001</span></div>
+          <div class="trust-pill"><div class="trust-dot"></div><span class="trust-label">IT &amp; GRC Specialist</span></div>
+          <div class="trust-pill"><div class="trust-dot"></div><span class="trust-label">Globally Aligned</span></div>
+        </div>
+      </div>
+
+      <!-- Hero logo display (desktop) -->
+      <div class="hero-visual">
+        <div class="hero-logo-frame">
+          <div class="ring ring-1"></div>
+          <div class="ring ring-2"></div>
+          <div class="ring ring-3"></div>
+          <div class="hero-mark">
+            <!-- ARCReady V3 arch mark: hero size, gold on dark -->
+            <svg width="110" height="98" viewBox="0 0 56 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M23 2 L28 9 L33 2" fill="none" stroke="#BFA06A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="26.5" y1="10" x2="5"  y2="47" stroke="#BFA06A" stroke-width="5.5" stroke-linecap="square"/>
+              <line x1="29.5" y1="10" x2="51" y2="47" stroke="#BFA06A" stroke-width="5.5" stroke-linecap="square"/>
+              <line x1="13"   y1="29" x2="43" y2="29" stroke="#BFA06A" stroke-width="5.5" stroke-linecap="square"/>
+            </svg>
+            <div class="hero-mark-name">ARCReady</div>
+            <div class="hero-mark-tag">Audit &nbsp;&middot;&nbsp; Risk &nbsp;&middot;&nbsp; Compliance</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════
+     VALUE PROPOSITION
+══════════════════════════════════════════════════ -->
+<section id="value-prop">
+  <div class="container">
+
+    <div class="value-header reveal">
+      <div class="eyebrow eyebrow--center">Why ARCReady</div>
+      <h2 class="section-title" style="text-align:center;">What sets us apart</h2>
+      <p class="section-sub section-sub--center">
+        Every engagement is backed by professional rigour, internationally recognised regulatory frameworks,<br>and findings you can actually act on.
+      </p>
+    </div>
+
+    <div class="value-grid">
+      <div class="value-card reveal d1">
+        <div class="val-number">01</div>
+        <div class="val-title">Tailored ARC Readiness</div>
+        <p class="val-body">We assess your organisation's audit, risk, and compliance standing to ensure full readiness for regulatory requirements — mapped to your specific operating environment.</p>
+      </div>
+      <div class="value-card reveal d2">
+        <div class="val-number">02</div>
+        <div class="val-title">Expert-Led, CA(SA) Backed</div>
+        <p class="val-body">Our assessments are led by a qualified CA(SA) with hands-on experience in external audit, IT general controls, and information systems — not junior associates working from templates.</p>
+      </div>
+      <div class="value-card reveal d3">
+        <div class="val-number">03</div>
+        <div class="val-title">Actionable, Not Just Theoretical</div>
+        <p class="val-body">You receive a structured report with prioritised findings and a clear remediation roadmap — not a list of observations with no direction. Every finding comes with a next step.</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════
+     HOW IT WORKS
+══════════════════════════════════════════════════ -->
+<section id="how-it-works">
+  <div class="hiw-deco hiw-deco-1"></div>
+  <div class="hiw-deco hiw-deco-2"></div>
+  <div class="container">
+
+    <div class="hiw-header reveal">
+      <div class="eyebrow eyebrow--light eyebrow--center">Our Process</div>
+      <h2 class="section-title section-title--light">How ARCReady Works</h2>
+      <p class="section-sub section-sub--light section-sub--center" style="margin-top:10px;">
+        A structured four-step engagement from first contact to ongoing assurance.
+      </p>
+    </div>
+
+    <div class="hiw-steps">
+      <div class="hiw-card reveal d1">
+        <div class="hiw-num">1</div>
+        <div class="hiw-title">Discovery Call</div>
+        <p class="hiw-body">We understand your business, regulatory environment, and risk profile before a single document is reviewed.</p>
+      </div>
+      <div class="hiw-card reveal d2">
+        <div class="hiw-num">2</div>
+        <div class="hiw-title">Assessment</div>
+        <p class="hiw-body">We evaluate your controls, documentation, and compliance posture across all relevant domains with professional rigour.</p>
+      </div>
+      <div class="hiw-card reveal d3">
+        <div class="hiw-num">3</div>
+        <div class="hiw-title">Report &amp; Roadmap</div>
+        <p class="hiw-body">You receive a comprehensive report with prioritised findings, gap analysis, and practical, sequenced next steps.</p>
+      </div>
+      <div class="hiw-card reveal d4">
+        <div class="hiw-num">4</div>
+        <div class="hiw-title">Ongoing Support</div>
+        <p class="hiw-body">Stay on track with optional follow-up reviews and advisory support as your remediation progresses.</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════
+     TRUST BAR
+══════════════════════════════════════════════════ -->
+<div id="trust-bar">
+  <div class="container">
+    <div class="trust-bar-inner">
+
+      <div class="trust-bar-item">
+        <svg class="trust-bar-icon" width="18" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <span class="trust-bar-text">CA(SA) Qualified</span>
+      </div>
+
+      <div class="trust-bar-item">
+        <svg class="trust-bar-icon" width="18" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+        <span class="trust-bar-text">IRBA Framework</span>
+      </div>
+
+      <div class="trust-bar-item">
+        <svg class="trust-bar-icon" width="18" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+        </svg>
+        <span class="trust-bar-text">Globally Aligned</span>
+      </div>
+
+      <div class="trust-bar-item">
+        <svg class="trust-bar-icon" width="18" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="6" height="6"/><path d="M15 9V4h-6v5M15 15v5h-6v-5M9 15H4v-6h5M15 9h5v6h-5"/>
+        </svg>
+        <span class="trust-bar-text">IT &amp; GRC Specialist</span>
+      </div>
+
+      <div class="trust-bar-item">
+        <svg class="trust-bar-icon" width="18" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
+        </svg>
+        <span class="trust-bar-text">BDO-Trained</span>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════
+     SERVICES
+══════════════════════════════════════════════════ -->
+<section id="services">
+  <div class="container">
+
+    <div class="services-header reveal">
+      <div class="eyebrow">Our Services</div>
+      <h2 class="section-title">Choose the level of readiness<br>that fits your business.</h2>
+      <p class="section-sub" style="margin-top:4px;">
+        Every ARCReady engagement produces a structured, scoped report you can present to management, auditors, or your board.
+      </p>
+    </div>
+
+    <div class="services-grid">
+
+      <!-- Tier 1 -->
+      <div class="svc-card reveal d1">
+        <div class="svc-card-head">
+          <div class="svc-tier">Tier 1</div>
+          <div class="svc-name">Basic ARC<br>Health Check</div>
+          <div class="svc-ideal">Ideal for: Organisations new to formal compliance or preparing for their first external review.</div>
+        </div>
+        <div class="svc-card-body">
+          <div class="svc-includes">What's Included</div>
+          <div class="svc-features">
+            <div class="svc-feature"><div class="svc-dot"></div><span class="svc-feat-text">High-level review of key audit and compliance areas</span></div>
+            <div class="svc-feature"><div class="svc-dot"></div><span class="svc-feat-text">Gap identification benchmarked against COSO, PCAOB, and SOX baseline control requirements</span></div>
+            <div class="svc-feature"><div class="svc-dot"></div><span class="svc-feat-text">Executive summary report with prioritised findings</span></div>
+            <div class="svc-feature"><div class="svc-dot"></div><span class="svc-feat-text">1 x follow-up Q&amp;A session</span></div>
+          </div>
+          <div class="svc-callout">
+            <p class="svc-callout-text">Best entry point to understand where you stand before committing to a deeper review.</p>
+          </div>
+          <a href="#contact" class="btn btn-outline">Get Started &nbsp;&#8594;</a>
+        </div>
+      </div>
+
+      <!-- Tier 2 — Featured -->
+      <div class="svc-card svc-card--feat reveal d2">
+        <div class="svc-popular">Most Popular</div>
+        <div class="svc-card-head">
+          <div class="svc-tier">Tier 2</div>
+          <div class="svc-name">Compliance &amp;<br>Risk Assessment</div>
+          <div class="svc-ideal">Ideal for: Organisations with regulatory exposure, upcoming audits, or cross-border compliance obligations.</div>
+        </div>
+        <div class="svc-card-body">
+          <div class="svc-includes">What's Included</div>
+          <div class="svc-features">
+            <div class="svc-feature"><div class="svc-dot"></div><span class="svc-feat-text">All Basic tier deliverables</span></div>
+            <div class="svc-feature"><div class="svc-dot"></div><span class="svc-feat-text">Detailed compliance gap analysis mapped to PCAOB, SOX Section 404, ISO 27001, and GDPR as applicable</span></div>
+            <div class="svc-feature"><div class="svc-dot"></div><span class="svc-feat-text">Risk register development or review aligned to COSO ERM principles</span></div>
+            <div class="svc-feature"><div class="svc-dot"></div><span class="svc-feat-text">Control effectiveness assessment across financial and operational domains</span></div>
+            <div class="svc-feature"><div class="svc-dot"></div><span class="svc-feat-text">Structured remediation roadmap with prioritised actions</span></div>
+            <div class="svc-feature"><div class="svc-dot"></div><span class="svc-feat-text">2 x advisory sessions</span></div>
+          </div>
+          <div class="svc-callout">
+            <p class="svc-callout-text">The most popular tier for organisations preparing for a formal external audit or regulatory review.</p>
+          </div>
+          <a href="#contact" class="btn btn-gold">Book a Discovery Call</a>
+        </div>
+      </div>
+
+      <!-- Tier 3 -->
+      <div class="svc-card reveal d3">
+        <div class="svc-card-head">
+          <div class="svc-tier">Tier 3</div>
+          <div class="svc-name">Full GRC<br>Assessment</div>
+          <div class="svc-ideal">Ideal for: Organisations seeking comprehensive, board-level governance, risk, and compliance assurance.</div>
+        </div>
+        <div class="svc-card-body">
+          <div class="svc-includes">What's Included</div>
+          <div class="svc-features">
+            <div class="svc-feature"><div class="svc-dot"></div><span class="svc-feat-text">All Compliance &amp; Risk tier deliverables</span></div>
+            <div class="svc-feature"><div class="svc-dot"></div><span class="svc-feat-text">IT General Controls (ITGC) review benchmarked against PCAOB AS 2201 and COBIT 2019</span></div>
+            <div class="svc-feature"><div class="svc-dot"></div><span class="svc-feat-text">SOP walkthrough and storyboard analysis across control domains</span></div>
+            <div class="svc-feature"><div class="svc-dot"></div><span class="svc-feat-text">Full COSO Internal Control framework alignment assessment</span></div>
+            <div class="svc-feature"><div class="svc-dot"></div><span class="svc-feat-text">Board-ready GRC report with executive summary</span></div>
+            <div class="svc-feature"><div class="svc-dot"></div><span class="svc-feat-text">Ongoing monthly advisory retainer (optional)</span></div>
+          </div>
+          <div class="svc-callout">
+            <p class="svc-callout-text">Designed for organisations that need a full-picture view across governance, risk, compliance, and IT controls — aligned to globally recognised standards.</p>
+          </div>
+          <a href="#contact" class="btn btn-outline">Get Started &nbsp;&#8594;</a>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="services-cta reveal">
+      <p class="services-cta-note">Not sure which tier is right for you?</p>
+      <a href="#contact" class="btn btn-royal">Book a Free Discovery Call</a>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════
+     CTA BANNER
+══════════════════════════════════════════════════ -->
+<div id="cta-banner">
+  <div class="cta-deco cta-deco-1"></div>
+  <div class="cta-deco cta-deco-2"></div>
+  <div class="container">
+    <div class="cta-inner reveal">
+      <div class="eyebrow eyebrow--light eyebrow--center">Take the First Step</div>
+      <h2 class="cta-title">Ready to know where you stand?</h2>
+      <p class="cta-sub">Book a free 30-minute discovery call. No obligation, no jargon — just clarity on your audit and compliance posture.</p>
+      <a href="#contact" class="btn btn-gold" style="margin:0 auto;">Book Your Free Call</a>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════
+     ABOUT
+══════════════════════════════════════════════════ -->
+<section id="about">
+  <div class="container">
+    <div class="about-grid">
+
+      <!-- Left: story + founder -->
+      <div>
+        <div class="eyebrow reveal">About ARCReady</div>
+        <h2 class="section-title reveal">Built by auditors.<br>Designed for business.</h2>
+        <div class="ornament reveal">
+          <div class="ornament-line"></div>
+          <div class="ornament-diamond"></div>
+          <div class="ornament-diamond"></div>
+          <div class="ornament-line"></div>
+        </div>
+        <p class="about-body reveal">
+          ARCReady was founded to solve a problem that's all too common in organisations globally: businesses facing audits, regulatory reviews, or compliance obligations without a clear picture of where they stand.
+        </p>
+        <p class="about-body reveal" style="margin-top:-16px;">
+          We bridge that gap — giving you the clarity, documentation, and remediation direction you need before the auditors arrive.
+        </p>
+
+        <!-- Founder card -->
+        <div class="founder-card reveal">
+          <div class="founder-avatar">
+            <!-- ARCReady V3 arch mark: avatar size -->
+            <svg width="38" height="34" viewBox="0 0 56 50" fill="none">
+              <path d="M23 2 L28 9 L33 2" fill="none" stroke="#BFA06A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="26.5" y1="10" x2="5"  y2="47" stroke="#BFA06A" stroke-width="5.5" stroke-linecap="square"/>
+              <line x1="29.5" y1="10" x2="51" y2="47" stroke="#BFA06A" stroke-width="5.5" stroke-linecap="square"/>
+              <line x1="13"   y1="29" x2="43" y2="29" stroke="#BFA06A" stroke-width="5.5" stroke-linecap="square"/>
+            </svg>
+          </div>
+          <div class="founder-name">ARCReady Founder</div>
+          <div class="founder-role">CA(SA) &middot; IT Audit &middot; GRC Advisory</div>
+          <p class="founder-bio">
+            ARCReady is led by a CA(SA) with over five years of experience spanning external audit, audit data analytics, and information systems auditing at a Big 4-affiliated firm. After working across audit engagements, ITGC assessments, and data analytics projects for clients across multiple industries, ARCReady was established to bring that same rigour directly to businesses — on their terms, at their pace.
+          </p>
+          <div class="tag-row">
+            <span class="tag tag-r">CA(SA)</span>
+            <span class="tag tag-g">BDO International</span>
+            <span class="tag tag-o">External Audit</span>
+            <span class="tag tag-g">IT General Controls</span>
+            <span class="tag tag-o">Audit Data Analytics</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: values -->
+      <div>
+        <div class="eyebrow reveal">Our Values</div>
+        <h3 class="values-title reveal">Why ARCReady?</h3>
+
+        <div class="value-items">
+
+          <div class="vi reveal d1">
+            <div class="vi-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C8A96A" stroke-width="1.5" stroke-linecap="round">
+                <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+              </svg>
+            </div>
+            <div>
+              <div class="vi-name">Practical over Theoretical</div>
+              <p class="vi-body">We focus on findings you can actually act on. Every observation in our reports comes with a clear, prioritised remediation recommendation.</p>
+            </div>
+          </div>
+
+          <div class="vi reveal d2">
+            <div class="vi-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C8A96A" stroke-width="1.5" stroke-linecap="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+            </div>
+            <div>
+              <div class="vi-name">Independent and Objective</div>
+              <p class="vi-body">Our assessments are conflict-free and grounded in professional standards — no vendor relationships, no hidden agendas.</p>
+            </div>
+          </div>
+
+          <div class="vi reveal d3">
+            <div class="vi-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C8A96A" stroke-width="1.5" stroke-linecap="round">
+                <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+              </svg>
+            </div>
+            <div>
+              <div class="vi-name">Globally Aligned Standards</div>
+              <p class="vi-body">We work across the full spectrum of internationally recognised frameworks — COSO, PCAOB, SOX, ISO 27001, COBIT, GDPR, and IFRS — ensuring our assessments translate to any regulatory environment your organisation operates in.</p>
+            </div>
+          </div>
+
+          <div class="vi reveal d4">
+            <div class="vi-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C8A96A" stroke-width="1.5" stroke-linecap="round">
+                <circle cx="12" cy="8" r="6"/>
+                <path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
+              </svg>
+            </div>
+            <div>
+              <div class="vi-name">CA(SA) Rigour</div>
+              <p class="vi-body">Every engagement is backed by professional training and real-world audit experience — not off-the-shelf checklists or junior resources.</p>
+            </div>
+          </div>
+
+        </div>
+
+        <div style="margin-top:40px;" class="reveal">
+          <a href="#contact" class="btn-ghost-gold">Get in Touch &nbsp;&#8594;</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════
+     CONTACT
+══════════════════════════════════════════════════ -->
+<section id="contact">
+  <div class="contact-deco contact-deco-1"></div>
+  <div class="contact-deco contact-deco-2"></div>
+  <div class="container">
+    <div class="contact-grid">
+
+      <!-- Left: info -->
+      <div>
+        <div class="eyebrow eyebrow--light reveal">Get in Touch</div>
+        <h2 class="contact-title reveal">Let's talk about<br>your readiness.</h2>
+        <p class="contact-sub reveal">
+          Whether you have a specific engagement in mind or just want to understand your options, we're happy to have a no-obligation conversation.
+        </p>
+
+        <div class="contact-options">
+
+          <div class="co reveal d1">
+            <div class="co-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                <rect x="3" y="4" width="18" height="18" rx="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+            </div>
+            <div>
+              <div class="co-title">Book a Free Discovery Call</div>
+              <p class="co-text">Schedule a 30-minute call at a time that suits you. No obligation, no jargon — just clarity.</p>
+              <span class="co-link">Schedule a Call &#8594;</span>
+            </div>
+          </div>
+
+          <div class="co reveal d2">
+            <div class="co-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
+              </svg>
+            </div>
+            <div>
+              <div class="co-title">Send a Message</div>
+              <p class="co-text">Prefer email? Reach out directly and we'll respond within one business day.</p>
+              <a href="mailto:hello@arcready.co.za" class="co-link">hello@arcready.co.za</a>
+            </div>
+          </div>
+
+          <div class="co reveal d3">
+            <div class="co-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+              </svg>
+            </div>
+            <div>
+              <div class="co-title">Global Reach</div>
+              <p class="co-text">ARCReady works with organisations across multiple jurisdictions, delivering remote and on-site engagements worldwide.</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Right: form -->
+      <div class="reveal">
+        <div class="form-wrap">
+          <div class="form-title">Send a Message</div>
+          <form id="contactForm">
+            <div class="form-grid">
+
+              <div class="fg">
+                <label class="fl">Name *</label>
+                <input class="fi" type="text" placeholder="Your full name" required>
+              </div>
+
+              <div class="fg">
+                <label class="fl">Company</label>
+                <input class="fi" type="text" placeholder="Organisation name">
+              </div>
+
+              <div class="fg">
+                <label class="fl">Email *</label>
+                <input class="fi" type="email" placeholder="you@company.com" required>
+              </div>
+
+              <div class="fg">
+                <label class="fl">Phone</label>
+                <input class="fi" type="tel" placeholder="+1 / +44 / +27 ...">
+              </div>
+
+              <div class="fg full">
+                <label class="fl">What are you looking for?</label>
+                <select class="fs">
+                  <option value="">Select an option</option>
+                  <option>General Enquiry</option>
+                  <option>Book Assessment</option>
+                  <option>Partnership</option>
+                  <option>Other</option>
+                </select>
+              </div>
+
+              <div class="fg full">
+                <label class="fl">Message</label>
+                <textarea class="ft" placeholder="Tell us about your situation or what you're looking for..."></textarea>
+              </div>
+
+              <div class="fg full" style="margin-top:4px;">
+                <button type="submit" class="btn btn-gold" id="submitBtn" style="width:100%;justify-content:center;">
+                  Send Message
+                </button>
+              </div>
+
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════
+     FOOTER
+══════════════════════════════════════════════════ -->
+<footer id="footer">
+  <div class="container">
+
+    <div class="footer-top">
+
+      <div class="footer-logo">
+        <!-- ARCReady V3 arch mark: footer size, gold on dark -->
+        <svg width="28" height="25" viewBox="0 0 56 50" fill="none">
+          <path d="M23 2 L28 9 L33 2" fill="none" stroke="#BFA06A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="26.5" y1="10" x2="5"  y2="47" stroke="#BFA06A" stroke-width="5.5" stroke-linecap="square"/>
+          <line x1="29.5" y1="10" x2="51" y2="47" stroke="#BFA06A" stroke-width="5.5" stroke-linecap="square"/>
+          <line x1="13"   y1="29" x2="43" y2="29" stroke="#BFA06A" stroke-width="5.5" stroke-linecap="square"/>
+        </svg>
+        <div>
+          <div class="footer-logo-name">ARCReady</div>
+          <div class="footer-logo-sub">Audit &middot; Risk &middot; Compliance</div>
+        </div>
+      </div>
+
+      <nav class="footer-nav">
+        <a href="#home">Home</a>
+        <a href="#services">Services</a>
+        <a href="#about">About</a>
+        <a href="#contact">Contact</a>
+      </nav>
+
+      <a href="mailto:hello@arcready.co.za" class="footer-email">hello@arcready.co.za</a>
+
+    </div>
+
+    <div class="footer-bottom">
+      <p class="footer-copy">&copy; 2025 ARCReady. All rights reserved.</p>
+      <p class="footer-tagline">"Know where you stand before they arrive."</p>
+    </div>
+
+  </div>
+</footer>
+
+
+<!-- ══════════════════════════════════════════════════
+     SCRIPTS
+══════════════════════════════════════════════════ -->
+<script>
+
+/* ── Scroll progress bar ── */
+const progressBar = document.getElementById('scroll-progress');
+function updateScrollProgress() {
+  const scrollTop = window.scrollY;
+  const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+  const pct = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+  progressBar.style.width = pct + '%';
+}
+
+/* ── Navbar scroll ── */
+const navbar = document.getElementById('navbar');
+window.addEventListener('scroll', () => {
+  navbar.classList.toggle('scrolled', window.scrollY > 40);
+  updateNav();
+  updateScrollProgress();
+}, { passive: true });
+
+/* ── Active nav link ── */
+function updateNav() {
+  const ids = ['home','services','about','contact'];
+  const y   = window.scrollY + 120;
+  let cur   = 'home';
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.offsetTop <= y) cur = id;
+  });
+  document.querySelectorAll('.nav-links a').forEach(a => {
+    a.classList.toggle('active', a.getAttribute('href') === '#' + cur);
+  });
+}
+
+/* ── Mobile menu ── */
+const hamburger  = document.getElementById('hamburger');
+const mobileNav  = document.getElementById('mobileNav');
+hamburger.addEventListener('click', () => mobileNav.classList.toggle('open'));
+function closeMobileNav() { mobileNav.classList.remove('open'); }
+
+/* ── Scroll-reveal (IntersectionObserver) ── */
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); }
+  });
+}, { threshold: 0.1, rootMargin: '0px 0px -30px 0px' });
+document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+/* ── Contact form ── */
+document.getElementById('contactForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  btn.textContent = 'Message Sent';
+  btn.style.background = 'var(--gold-muted)';
+  btn.style.pointerEvents = 'none';
+  setTimeout(() => {
+    btn.textContent = 'Send Message';
+    btn.style.background = '';
+    btn.style.pointerEvents = '';
+    this.reset();
+  }, 3500);
+});
+
+/* ── Smooth scroll helper ── */
+function scrollTo(id) {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+}
+
+</script>
+</body>
+</html>
