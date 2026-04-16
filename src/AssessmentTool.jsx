@@ -366,6 +366,101 @@ Produce the gap analysis JSON now. Be specific to the industry context. Flag Cri
 }
 
 // ─── Supabase lead save (lightweight fetch, no SDK needed) ────────────────────
+function buildRuleBasedReport(framework, profile, answers) {
+  const answerWeights = { yes: 100, partial: 60, no: 20, unsure: 40 };
+  const answerStatus = {
+    yes: "Compliant",
+    partial: "Partial",
+    no: "Non-Compliant",
+    unsure: "Not Assessed",
+  };
+  const priorityOrder = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+
+  function getPriority(answer, index) {
+    if (answer === "no") return index < 4 ? "Critical" : "High";
+    if (answer === "partial") return index < 4 ? "High" : "Medium";
+    if (answer === "unsure") return "Medium";
+    return "Low";
+  }
+
+  function getEffort(answer) {
+    if (answer === "no") return "Weeks";
+    if (answer === "partial") return "Days";
+    if (answer === "unsure") return "Days";
+    return "Days";
+  }
+
+  function getRecommendation(question, answer) {
+    if (answer === "yes") {
+      return "Maintain the control, preserve evidence, and keep it in the regular review cycle.";
+    }
+    if (answer === "partial") {
+      return `Formalise, document, and fully evidence this control area: ${question.text}`;
+    }
+    if (answer === "unsure") {
+      return `Confirm control ownership and perform an evidence review for: ${question.text}`;
+    }
+    return `Design and implement a documented control response for: ${question.text}`;
+  }
+
+  const findings = framework.questions
+    .map((question, index) => {
+      const answer = answers[question.id] || "unsure";
+      if (answer === "yes") return null;
+
+      return {
+        controlId: `${framework.name} Q${index + 1}`,
+        controlName: question.text.replace(/\s*\([^)]*\)\s*$/u, ""),
+        status: answerStatus[answer],
+        priority: getPriority(answer, index),
+        gapDescription:
+          answer === "partial"
+            ? "This control appears to exist, but the response suggests design, documentation, or operating evidence gaps remain."
+            : answer === "unsure"
+              ? "The organisation could not confirm whether this control is operating effectively, creating uncertainty against the framework."
+              : "This control does not appear to be implemented based on the submitted response.",
+        evidenceRequired: `Provide policy, procedure, ownership, and operating evidence for: ${question.text}`,
+        recommendation: getRecommendation(question, answer),
+        estimatedEffort: getEffort(answer),
+      };
+    })
+    .filter(Boolean);
+
+  const scores = framework.questions.map((question) => {
+    const answer = answers[question.id] || "unsure";
+    return answerWeights[answer] ?? 40;
+  });
+  const overallScore = Math.round(scores.reduce((sum, value) => sum + value, 0) / scores.length);
+  const criticalCount = findings.filter(f => f.priority === "Critical").length;
+  const highCount = findings.filter(f => f.priority === "High").length;
+  const implementedCount = framework.questions.filter((question) => (answers[question.id] || "unsure") === "yes").length;
+  const partialCount = framework.questions.filter((question) => (answers[question.id] || "unsure") === "partial").length;
+
+  const overallRating = overallScore >= 75 && criticalCount === 0
+    ? "Low Risk"
+    : overallScore >= 50 && criticalCount < 2
+      ? "Medium Risk"
+      : "High Risk";
+
+  const top5Actions = findings
+    .slice()
+    .sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
+    .slice(0, 5)
+    .map(f => f.recommendation);
+
+  return {
+    frameworkName: framework.name,
+    executiveSummary: `${profile.company} was assessed against ${framework.name} using ${framework.questions.length} control questions. ${implementedCount} controls were confirmed as fully in place, ${partialCount} were partially in place, and ${findings.length - partialCount} were either missing or not evidenced. Based on the submitted responses, the current posture is rated ${overallRating.toLowerCase()} with an overall score of ${overallScore}/100.`,
+    overallRating,
+    overallScore,
+    findings,
+    top5Actions,
+    nextStep: criticalCount + highCount > 0
+      ? "Use this assessment to prioritise remediation, then engage ARCReady to validate evidence and close the highest-risk gaps."
+      : "Your responses indicate a stronger control posture; ARCReady can help validate evidence and prepare you for formal review.",
+  };
+}
+
 async function saveLead(profile, frameworks, answers, reports) {
   const url = import.meta.env.VITE_SUPABASE_URL;
   const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -696,6 +791,7 @@ export default function AssessmentTool() {
     await Promise.all(
       selectedFrameworks.map(async (fwId) => {
         const fw = FRAMEWORKS.find(f => f.id === fwId);
+        const fallbackReport = buildRuleBasedReport(fw, profile, answers[fwId] || {});
         try {
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), 45000);
@@ -749,15 +845,7 @@ export default function AssessmentTool() {
           completed[fwId] = JSON.parse(clean);
         } catch (err) {
           setAssessmentError(prev => prev || err.message || "Assessment generation failed.");
-          completed[fwId] = {
-            frameworkName: fw.name,
-            executiveSummary: "Assessment could not be completed. Please try again or contact ARCReady directly.",
-            overallRating: "Not Assessed",
-            overallScore: 0,
-            findings: [],
-            top5Actions: [],
-            nextStep: "Contact ARCReady at hello@arcready.co.za",
-          };
+          completed[fwId] = fallbackReport;
         }
         const doneCount = Object.keys(completed).length;
         setLoadingMsg(`${doneCount} of ${selectedFrameworks.length} frameworks complete...`);
@@ -1075,6 +1163,20 @@ export default function AssessmentTool() {
             Book Free Consultation →
           </a>
         </div>
+
+        {assessmentError && (
+          <div style={{
+            background: "#fff7ed",
+            border: "1px solid #fdba74",
+            color: "#9a3412",
+            borderRadius: 10,
+            padding: "12px 16px",
+            fontSize: 13,
+            marginBottom: 20,
+          }}>
+            AI enhancement is currently unavailable, so this report was generated directly from your framework responses.
+          </div>
+        )}
 
         {/* Framework tabs (if multiple) */}
         {selectedFrameworks.length > 1 && (
