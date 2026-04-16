@@ -462,10 +462,37 @@ function buildRuleBasedReport(framework, profile, answers) {
 }
 
 async function saveLead(profile, frameworks, answers, reports) {
+  const payload = {
+    name: profile.name,
+    company: profile.company,
+    email: profile.email,
+    phone: profile.phone || null,
+    industry: profile.industry,
+    size: profile.size,
+    frameworks,
+    answers,
+    report: reports,
+  };
+
+  const serverRes = await fetch("/api/lead", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (serverRes.ok) return;
+
+  const serverText = await serverRes.text();
   const url = import.meta.env.VITE_SUPABASE_URL;
   const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  if (!url || !key || url.includes("supabase.com/dashboard")) return;
-  await fetch(`${url}/rest/v1/assessment_leads`, {
+
+  if (!url || !key || url.includes("supabase.com/dashboard")) {
+    throw new Error(serverText || "Lead save failed and no direct Supabase fallback is configured.");
+  }
+
+  const fallbackRes = await fetch(`${url}/rest/v1/assessment_leads`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -473,18 +500,13 @@ async function saveLead(profile, frameworks, answers, reports) {
       "Authorization": `Bearer ${key}`,
       "Prefer": "return=minimal",
     },
-    body: JSON.stringify({
-      name: profile.name,
-      company: profile.company,
-      email: profile.email,
-      phone: profile.phone || null,
-      industry: profile.industry,
-      size: profile.size,
-      frameworks,
-      answers,
-      report: reports,
-    }),
+    body: JSON.stringify(payload),
   });
+
+  if (!fallbackRes.ok) {
+    const fallbackText = await fallbackRes.text();
+    throw new Error(fallbackText || serverText || "Lead save failed.");
+  }
 }
 
 // ─── Status badge colours ─────────────────────────────────────────────────────
@@ -803,7 +825,7 @@ export default function AssessmentTool() {
             : "/api/assess";
           const body = isDev
             ? JSON.stringify({
-                model: "claude-sonnet-4-20250514",
+                model: "claude-sonnet-4-6",
                 max_tokens: 4000,
                 system: buildSystemPrompt(fwId),
                 messages: [{ role: "user", content: buildUserPrompt(fw, profile, answers[fwId] || {}) }],
