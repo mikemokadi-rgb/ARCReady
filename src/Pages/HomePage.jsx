@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ARCLogo } from '../components/ARCLogo';
-import { useReveal } from '../hooks/useReveal';
+import { ARCLogo } from '../Components/ARCLogo';
+import { useReveal } from '../Hooks/useReveal';
 
 export function HomePage() {
   useReveal();
