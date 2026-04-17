@@ -1,37 +1,24 @@
 /**
  * ARCReady Control Self-Assessment Tool
- * Drop into your existing Vite + React project.
+ * 
+ * Architecture:
+ * - Browser collects responses across 6 frameworks
+ * - Each framework POSTs to /api/assess (Vercel serverless function)
+ * - Server calls Anthropic API with full SKILL.md content injected
+ * - Returns real audit-grade gap analysis JSON
+ * - PDF generated client-side using jsPDF
  *
- * Required env vars (Vite):
- *   VITE_ANTHROPIC_API_KEY   — your Anthropic API key
- *   VITE_SUPABASE_URL        — your Supabase project URL
- *   VITE_SUPABASE_ANON_KEY   — your Supabase anon key
- *   VITE_RESEND_API_KEY      — your Resend API key (used server-side via Vercel Function)
- *
- * Supabase table required:
- *   assessment_leads (
- *     id uuid default gen_random_uuid() primary key,
- *     created_at timestamptz default now(),
- *     name text, company text, email text, phone text,
- *     industry text, size text, frameworks text[],
- *     answers jsonb, report jsonb
- *   )
- *
- * For production: move the Anthropic API call to a Vercel serverless
- * function at /api/assess.js to protect your API key.
- * The component below calls /api/assess in production and falls back
- * to direct API in dev — swap VITE_ANTHROPIC_API_KEY accordingly.
+ * Install jsPDF: npm install jspdf
  */
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
-// ─── ARCReady brand colours ───────────────────────────────────────────────────
-const ROYAL_BLUE  = "#1B3A6B";
-const MATTE_GOLD  = "#B8963E";
-const LIGHT_GOLD  = "#D4AF6A";
-const NAVY_LIGHT  = "#2A4F8A";
-const OFF_WHITE   = "#F8F6F1";
-const WARM_WHITE  = "#FDFCFA";
+// ─── Brand ────────────────────────────────────────────────────────────────────
+const ROYAL_BLUE = "#1B3461";
+const MATTE_GOLD = "#A4844A";
+const GOLD_LIGHT = "#BFA06A";
+const PAGE_BG    = "#F3EDE2";
+const OFF_WHITE  = "#F8F5F0";
 
 // ─── Framework definitions ────────────────────────────────────────────────────
 const FRAMEWORKS = [
@@ -39,490 +26,435 @@ const FRAMEWORKS = [
     id: "iso27001",
     name: "ISO 27001",
     subtitle: "Information Security Management",
-    icon: "🔒",
-    color: "#1B3A6B",
-    description: "ISMS gap analysis against ISO 27001:2022 Annex A controls",
+    icon: "/frameworks/iso27001.png",
+    description: "Gap analysis against ISO 27001:2022 — 93 Annex A controls across 4 themes",
     questions: [
-      { id: "q1",  text: "Do you have a formally documented Information Security Policy, signed by senior management and reviewed annually?" },
+      { id: "q1",  text: "Do you have a formally documented Information Security Policy, approved by senior management and reviewed at least annually?" },
       { id: "q2",  text: "Is there a maintained asset inventory with designated owners for all information assets?" },
       { id: "q3",  text: "Are formal user access reviews conducted at least every 6 months with documented evidence?" },
-      { id: "q4",  text: "Do supplier/vendor contracts include information security clauses and regular reviews?" },
-      { id: "q5",  text: "Is there a documented, tested Incident Response procedure with defined escalation paths?" },
-      { id: "q6",  text: "Has a formal risk assessment been completed in the last 12 months with a documented risk treatment plan?" },
-      { id: "q7",  text: "Is a patch management schedule in place with tracked remediation timelines?" },
-      { id: "q8",  text: "Is there a documented cryptography / encryption policy applied consistently across systems?" },
-      { id: "q9",  text: "Does a formal security awareness training programme exist beyond onboarding?" },
-      { id: "q10", text: "Is there a documented and tested Business Continuity / Disaster Recovery plan?" },
-      { id: "q11", text: "Is change management formally documented with approvals, testing, and rollback procedures?" },
-      { id: "q12", text: "Are physical security controls at server rooms / data centres documented and audited?" },
+      { id: "q4",  text: "Do supplier and vendor contracts include information security clauses reviewed at least annually?" },
+      { id: "q5",  text: "Is there a documented, tested Incident Response procedure with defined escalation paths and roles?" },
+      { id: "q6",  text: "Has a formal risk assessment been completed in the last 12 months with a documented risk treatment plan and Statement of Applicability?" },
+      { id: "q7",  text: "Is patch management formalised with a documented schedule, tracked remediation timelines, and evidence of completion?" },
+      { id: "q8",  text: "Is there a documented cryptography and encryption policy applied consistently across all systems storing or transmitting sensitive data?" },
+      { id: "q9",  text: "Does a formal, recurring security awareness training programme exist for all staff (beyond onboarding only)?" },
+      { id: "q10", text: "Is there a documented and tested Business Continuity and Disaster Recovery plan with defined RTOs and RPOs?" },
+      { id: "q11", text: "Is change management formally documented with approvals, testing requirements, and rollback procedures?" },
+      { id: "q12", text: "Are physical security controls at data centres and server rooms documented, reviewed, and subject to access logs?" },
     ],
   },
   {
     id: "iso42001",
     name: "ISO 42001",
     subtitle: "AI Management Systems",
-    icon: "🤖",
-    color: "#2A4F8A",
-    description: "AI governance readiness mapped to ISO 42001:2023 AIMS controls",
+    icon: "/frameworks/iso42001.png",
+    description: "AI governance readiness mapped to ISO 42001:2023 and South Africa's AI Policy",
     questions: [
-      { id: "q1",  text: "Does your organisation have a documented AI Policy approved by senior leadership?" },
-      { id: "q2",  text: "Is there a formal AI risk assessment process covering bias, transparency, and safety before deployment?" },
-      { id: "q3",  text: "Are AI systems subject to an impact assessment before production use?" },
-      { id: "q4",  text: "Is there documented human oversight and intervention capability for all AI decision systems?" },
-      { id: "q5",  text: "Do AI systems have documented data governance processes covering training data quality and lineage?" },
-      { id: "q6",  text: "Is there a defined AI incident response process with escalation to the board or risk committee?" },
-      { id: "q7",  text: "Are AI system outputs subject to regular accuracy and fairness monitoring?" },
-      { id: "q8",  text: "Is there a documented Responsible AI framework or ethics policy in place?" },
-      { id: "q9",  text: "Are AI suppliers and third-party AI tools subject to formal due diligence and contractual AI governance clauses?" },
-      { id: "q10", text: "Is there a process to keep AI systems current with applicable regulations (e.g. SA AI Policy, EU AI Act)?" },
-      { id: "q11", text: "Are staff who interact with AI systems provided with documented training on responsible use?" },
-      { id: "q12", text: "Is there a process for documenting and reviewing AI system retirement and lifecycle decisions?" },
+      { id: "q1",  text: "Does your organisation have a documented AI Policy approved by senior leadership that addresses responsible AI use?" },
+      { id: "q2",  text: "Is there a formal AI risk assessment process that evaluates bias, transparency, fairness, and safety before any AI system is deployed?" },
+      { id: "q3",  text: "Are AI systems subject to an AI System Impact Assessment (AISIA) that considers effects on individuals and society before production use?" },
+      { id: "q4",  text: "Is there documented human oversight capability and intervention mechanisms for all AI systems that make or influence decisions?" },
+      { id: "q5",  text: "Do AI systems have documented data governance processes covering training data quality, lineage, and legal basis for data use?" },
+      { id: "q6",  text: "Is there a defined AI incident response process with escalation procedures to board or risk committee level?" },
+      { id: "q7",  text: "Are AI system outputs subject to regular monitoring for accuracy, fairness, and performance drift in production?" },
+      { id: "q8",  text: "Is there a documented Responsible AI framework or ethics policy that addresses transparency, non-discrimination, and accountability?" },
+      { id: "q9",  text: "Are AI suppliers and third-party AI tools subject to formal due diligence including AI-specific contractual governance clauses?" },
+      { id: "q10", text: "Is there a process to monitor applicable AI regulations (South Africa's AI Policy, EU AI Act) and update governance accordingly?" },
+      { id: "q11", text: "Are staff who interact with or oversee AI systems provided with documented AI literacy and responsible use training?" },
+      { id: "q12", text: "Is there a process for documenting AI system lifecycle decisions including decommissioning, data deletion, and model retirement?" },
     ],
   },
   {
     id: "nist-csf",
     name: "NIST CSF 2.0",
     subtitle: "Cybersecurity Framework",
-    icon: "🛡️",
-    color: "#1a5c3a",
-    description: "Cybersecurity posture mapped to NIST CSF 2.0 six functions",
+    icon: "/frameworks/nist-csf.png",
+    description: "Cybersecurity posture across NIST CSF 2.0's six functions: Govern, Identify, Protect, Detect, Respond, Recover",
     questions: [
-      { id: "q1",  text: "Is there a documented cybersecurity governance structure with defined roles, policies, and board-level oversight? (GOVERN)" },
-      { id: "q2",  text: "Has a current asset inventory been completed covering hardware, software, data, and external systems? (IDENTIFY)" },
+      { id: "q1",  text: "Is there a documented cybersecurity governance structure with defined roles, board-level oversight, and a cybersecurity risk management strategy? (GOVERN)" },
+      { id: "q2",  text: "Has a current and complete asset inventory been maintained covering hardware, software, data assets, and external/third-party systems? (IDENTIFY)" },
       { id: "q3",  text: "Has a formal cybersecurity risk assessment been completed and documented in the last 12 months? (IDENTIFY)" },
-      { id: "q4",  text: "Is multi-factor authentication enforced for all privileged and remote access? (PROTECT)" },
-      { id: "q5",  text: "Are network segmentation and access controls in place and documented? (PROTECT)" },
-      { id: "q6",  text: "Is security awareness training mandatory and tracked for all staff annually? (PROTECT)" },
-      { id: "q7",  text: "Is there a SIEM, log management, or similar continuous monitoring capability in place? (DETECT)" },
-      { id: "q8",  text: "Are anomaly detection and alerting thresholds defined and regularly reviewed? (DETECT)" },
-      { id: "q9",  text: "Is there a documented and tested Incident Response Plan with defined recovery time objectives? (RESPOND)" },
-      { id: "q10", text: "Are post-incident reviews conducted and lessons learned formally documented? (RESPOND)" },
-      { id: "q11", text: "Is there a documented and tested Business Continuity / Disaster Recovery plan? (RECOVER)" },
-      { id: "q12", text: "Are backup and recovery procedures tested at least annually with documented results? (RECOVER)" },
+      { id: "q4",  text: "Is multi-factor authentication enforced for all privileged access, remote access, and administrative accounts? (PROTECT)" },
+      { id: "q5",  text: "Are network segmentation and documented access controls in place between systems of different sensitivity levels? (PROTECT)" },
+      { id: "q6",  text: "Is security awareness training mandatory, tracked, and completed by all staff at least annually? (PROTECT)" },
+      { id: "q7",  text: "Is there a SIEM, log management system, or equivalent continuous monitoring capability actively in use? (DETECT)" },
+      { id: "q8",  text: "Are anomaly detection thresholds and alerting rules defined, documented, and regularly reviewed? (DETECT)" },
+      { id: "q9",  text: "Is there a documented and tested Incident Response Plan with defined recovery time objectives and communication procedures? (RESPOND)" },
+      { id: "q10", text: "Are post-incident reviews conducted after significant events with lessons learned formally documented and actioned? (RESPOND)" },
+      { id: "q11", text: "Is there a documented and tested Business Continuity and Disaster Recovery plan with defined recovery objectives? (RECOVER)" },
+      { id: "q12", text: "Are backup and recovery procedures tested at least annually with documented results and evidence of successful restoration? (RECOVER)" },
     ],
   },
   {
     id: "soc2",
     name: "SOC 2",
     subtitle: "Trust Services Criteria",
-    icon: "✅",
-    color: "#5a2d82",
-    description: "SOC 2 Type 1 / Type 2 readiness across all Trust Services Criteria",
+    icon: "/frameworks/soc2.png",
+    description: "SOC 2 Type 1/2 readiness across all five Trust Services Criteria",
     questions: [
-      { id: "q1",  text: "Is there a board-approved Information Security policy and a documented control environment? (CC1)" },
-      { id: "q2",  text: "Are security policies communicated to all staff and acknowledged in writing? (CC2)" },
-      { id: "q3",  text: "Is there a formal risk assessment process with a documented risk register updated at least annually? (CC3)" },
-      { id: "q4",  text: "Are internal controls monitored continuously with documented deficiency tracking? (CC4)" },
-      { id: "q5",  text: "Are control activities (approvals, reconciliations, authorisations) formally documented and evidenced? (CC5)" },
-      { id: "q6",  text: "Is logical and physical access provisioning and de-provisioning formally controlled and reviewed? (CC6)" },
-      { id: "q7",  text: "Is there a documented incident response process with a tested disaster recovery capability? (CC7)" },
-      { id: "q8",  text: "Is change management formally controlled with approval, testing, and rollback documentation? (CC8)" },
-      { id: "q9",  text: "Are third-party vendors subject to documented risk assessments and contractual security requirements? (CC9)" },
-      { id: "q10", text: "If Availability is in scope — are uptime SLAs, capacity monitoring, and DR objectives documented? (A1)" },
-      { id: "q11", text: "If Confidentiality is in scope — is confidential data classified, encrypted, and subject to retention controls? (C1)" },
-      { id: "q12", text: "If Privacy is in scope — are data subject rights, consent management, and breach notification procedures documented? (P1–P8)" },
+      { id: "q1",  text: "Is there a board-approved Information Security policy and documented evidence of management's commitment to the control environment? (CC1)" },
+      { id: "q2",  text: "Are security policies formally communicated to all staff and acknowledged in writing at onboarding and annually? (CC2)" },
+      { id: "q3",  text: "Is there a formal risk assessment process with a documented risk register reviewed and updated at least annually? (CC3)" },
+      { id: "q4",  text: "Are internal controls monitored on an ongoing basis with a documented process for identifying and addressing deficiencies? (CC4)" },
+      { id: "q5",  text: "Are control activities (approvals, reconciliations, system access controls) formally documented with evidence of operation? (CC5)" },
+      { id: "q6",  text: "Is logical and physical access provisioning, de-provisioning, and quarterly access reviews formally controlled and evidenced? (CC6)" },
+      { id: "q7",  text: "Is there a documented incident response process with a tested disaster recovery capability and defined RTO/RPO? (CC7)" },
+      { id: "q8",  text: "Is change management formally controlled with documented approval, testing, and rollback procedures for all production changes? (CC8)" },
+      { id: "q9",  text: "Are third-party vendors subject to documented risk assessments, security questionnaires, and contractual security requirements? (CC9)" },
+      { id: "q10", text: "If Availability is in scope — are uptime SLAs, capacity monitoring, and DR objectives formally documented and measured? (A1)" },
+      { id: "q11", text: "If Confidentiality is in scope — is confidential data classified, encrypted, and subject to documented retention and disposal controls? (C1)" },
+      { id: "q12", text: "If Privacy is in scope — are data subject rights, consent management, retention schedules, and breach notification procedures documented? (P1–P8)" },
     ],
   },
   {
     id: "pci-dss",
     name: "PCI DSS",
     subtitle: "Payment Card Security",
-    icon: "💳",
-    color: "#8B2500",
+    icon: "/frameworks/pci-dss.png",
     description: "PCI DSS v4.0.1 readiness across all 12 requirements",
     questions: [
-      { id: "q1",  text: "Is the Cardholder Data Environment (CDE) formally scoped with network diagrams showing all payment data flows? (Req 1–2)" },
-      { id: "q2",  text: "Are firewalls and network access controls in place with documented rule reviews at least every 6 months? (Req 1)" },
-      { id: "q3",  text: "Is cardholder data (PAN) encrypted at rest and in transit, and is SAD never stored after authorisation? (Req 3–4)" },
-      { id: "q4",  text: "Are all CDE systems protected by up-to-date anti-malware and patch management processes? (Req 5–6)" },
-      { id: "q5",  text: "Is access to cardholder data restricted on a need-to-know basis with documented access control policies? (Req 7)" },
-      { id: "q6",  text: "Are unique IDs assigned to all CDE users and is shared / generic account use prohibited? (Req 8)" },
-      { id: "q7",  text: "Is physical access to CDE systems controlled, monitored, and logged? (Req 9)" },
-      { id: "q8",  text: "Is logging and monitoring in place for all CDE access with 12 months of log retention? (Req 10)" },
-      { id: "q9",  text: "Are network vulnerability scans (ASV) and penetration tests conducted as per PCI DSS schedule? (Req 11)" },
-      { id: "q10", text: "Is there a documented Information Security Policy covering all 12 PCI DSS requirements? (Req 12)" },
-      { id: "q11", text: "Are all third-party service providers (TPSPs) in the CDE formally listed with compliance status tracked? (Req 12.8)" },
-      { id: "q12", text: "Have you completed or identified the applicable SAQ type for your merchant / service provider level?" },
+      { id: "q1",  text: "Is the Cardholder Data Environment (CDE) formally scoped with current network diagrams showing all cardholder data flows and system connections?" },
+      { id: "q2",  text: "Are network security controls (firewalls, ACLs) in place with documented rule reviews conducted at least every 6 months? (Req 1–2)" },
+      { id: "q3",  text: "Is cardholder data (PAN) encrypted at rest and in transit using strong cryptography, and is Sensitive Authentication Data (SAD) never stored post-authorisation? (Req 3–4)" },
+      { id: "q4",  text: "Are all CDE systems protected by up-to-date anti-malware software and is patch management applied within defined timeframes? (Req 5–6)" },
+      { id: "q5",  text: "Is access to cardholder data restricted strictly on a need-to-know basis with documented access control policies enforced? (Req 7)" },
+      { id: "q6",  text: "Are unique IDs assigned to every CDE user, are shared/generic accounts prohibited, and is MFA enforced for all CDE access? (Req 8)" },
+      { id: "q7",  text: "Is physical access to CDE systems controlled, logged, and monitored with documented procedures for visitor access? (Req 9)" },
+      { id: "q8",  text: "Is comprehensive logging in place for all CDE access and system events, with 12 months retention and 3 months immediately available for review? (Req 10)" },
+      { id: "q9",  text: "Are quarterly internal vulnerability scans, ASV external scans, and annual penetration tests conducted and documented? (Req 11)" },
+      { id: "q10", text: "Is there a documented Information Security Policy covering all 12 PCI DSS requirements, reviewed annually and communicated to all staff? (Req 12)" },
+      { id: "q11", text: "Are all third-party service providers (TPSPs) in the CDE formally listed, their PCI DSS compliance status tracked, and contracts including security requirements? (Req 12.8)" },
+      { id: "q12", text: "Have you completed or identified the applicable SAQ type for your merchant or service provider level, and is your compliance programme formally managed?" },
     ],
   },
   {
     id: "gdpr",
     name: "GDPR / POPIA",
     subtitle: "Data Protection & Privacy",
-    icon: "🔐",
-    color: "#1a4a5c",
-    description: "GDPR and POPIA compliance readiness for data protection obligations",
+    icon: "/frameworks/gdpr.png",
+    description: "GDPR and POPIA compliance readiness for South African organisations",
     questions: [
-      { id: "q1",  text: "Is there a documented Record of Processing Activities (RoPA) covering all personal data processing operations?" },
-      { id: "q2",  text: "Has a lawful basis been identified and documented for each category of personal data processing?" },
-      { id: "q3",  text: "Are privacy notices provided to data subjects at the point of collection, covering all required disclosures?" },
-      { id: "q4",  text: "Is there a documented and tested Data Breach Response procedure meeting 72-hour notification obligations?" },
-      { id: "q5",  text: "Are Data Processing Agreements (DPAs) in place with all third-party processors handling personal data?" },
-      { id: "q6",  text: "Is there a process to handle data subject requests (access, deletion, portability) within statutory timeframes?" },
-      { id: "q7",  text: "Are Data Protection Impact Assessments (DPIAs) conducted for high-risk processing activities?" },
-      { id: "q8",  text: "Is personal data retention enforced with documented schedules and automated deletion where applicable?" },
-      { id: "q9",  text: "Are cross-border data transfers (outside SA / EEA) subject to documented transfer mechanisms?" },
-      { id: "q10", text: "Is there a designated Information Officer (POPIA) or Data Protection Officer (GDPR) formally appointed?" },
-      { id: "q11", text: "Is staff training on data protection obligations mandatory and tracked?" },
-      { id: "q12", text: "Are consent management processes in place where consent is the lawful basis, with withdrawal mechanisms?" },
+      { id: "q1",  text: "Is there a documented and maintained Record of Processing Activities (RoPA) covering all personal data processing operations across the organisation?" },
+      { id: "q2",  text: "Has a lawful basis been identified, documented, and communicated for each category of personal data processing activity?" },
+      { id: "q3",  text: "Are privacy notices provided to data subjects at the point of data collection, covering all required disclosures including purpose, retention, and rights?" },
+      { id: "q4",  text: "Is there a documented and tested Data Breach Response procedure capable of meeting the 72-hour notification obligation to regulators?" },
+      { id: "q5",  text: "Are Data Processing Agreements (DPAs) formally in place with all third-party processors who handle personal data on your behalf?" },
+      { id: "q6",  text: "Is there a documented process to handle data subject requests (access, deletion, portability, correction) within required statutory timeframes?" },
+      { id: "q7",  text: "Are Data Protection Impact Assessments (DPIAs) conducted before commencing any new high-risk processing activities?" },
+      { id: "q8",  text: "Are personal data retention schedules documented and enforced, with automated or procedural deletion processes in place?" },
+      { id: "q9",  text: "Are cross-border data transfers (outside South Africa or EEA as applicable) subject to documented and legally valid transfer mechanisms?" },
+      { id: "q10", text: "Has a designated Information Officer (POPIA) or Data Protection Officer (GDPR) been formally appointed and registered where required?" },
+      { id: "q11", text: "Is data protection training mandatory for all staff handling personal data, and are completion records maintained?" },
+      { id: "q12", text: "Where consent is the lawful basis for processing, are consent mechanisms compliant, documented, and withdrawal processes operational?" },
     ],
   },
 ];
 
 const ANSWER_OPTIONS = [
-  { value: "yes",     label: "Yes — fully in place",        color: "#166534", bg: "#dcfce7" },
-  { value: "partial", label: "Partial — some gaps exist",   color: "#92400e", bg: "#fef3c7" },
-  { value: "no",      label: "No — not implemented",        color: "#991b1b", bg: "#fee2e2" },
-  { value: "unsure",  label: "Unsure / not assessed",       color: "#374151", bg: "#f3f4f6" },
+  { value: "yes",     label: "Yes — fully in place",      color: "#166534", bg: "#dcfce7" },
+  { value: "partial", label: "Partial — some gaps exist", color: "#92400e", bg: "#fef3c7" },
+  { value: "no",      label: "No — not implemented",      color: "#991b1b", bg: "#fee2e2" },
+  { value: "unsure",  label: "Unsure / not assessed",     color: "#374151", bg: "#f3f4f6" },
 ];
 
-const INDUSTRY_OPTIONS = [
-  "Mining & Resources", "Financial Services", "Banking", "Insurance",
-  "Retail", "Manufacturing", "Healthcare", "Technology", "Government",
-  "Professional Services", "Energy & Utilities", "Other",
-];
+const INDUSTRY_OPTIONS = ["Mining & Resources","Financial Services","Banking","Insurance","Retail","Manufacturing","Healthcare","Technology","Government / Public Sector","Professional Services","Energy & Utilities","Other"];
+const SIZE_OPTIONS = ["1–50 employees","51–200 employees","201–500 employees","501–1,000 employees","1,000+ employees"];
 
-const SIZE_OPTIONS = [
-  "1–50 employees", "51–200 employees", "201–500 employees",
-  "501–1,000 employees", "1,000+ employees",
-];
+// ─── PDF Generator ─────────────────────────────────────────────────────────────
+async function generatePDF(profile, reports, selectedFrameworks) {
+  const { jsPDF } = await import("jspdf");
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const W = 210, margin = 18, contentW = W - margin * 2;
+  let y = 0;
 
-// ─── System prompts per framework ─────────────────────────────────────────────
-function buildSystemPrompt(frameworkId) {
-  const prompts = {
-    iso27001: `You are an expert ISO 27001:2022 Lead Auditor and ISMS implementation consultant at ARCReady, a Johannesburg-based GRC advisory firm. You are assessing a JSE-listed or similar regulated company.
-
-Produce a gap analysis in valid JSON only. No prose outside the JSON object.
-
-Return exactly this structure:
-{
-  "frameworkName": "ISO 27001:2022",
-  "executiveSummary": "3-4 sentence summary of overall posture",
-  "overallRating": "High Risk | Medium Risk | Low Risk",
-  "overallScore": <number 0-100>,
-  "findings": [
-    {
-      "controlId": "e.g. A.5.1",
-      "controlName": "Short control name",
-      "status": "Compliant | Partial | Non-Compliant | Not Assessed",
-      "priority": "Critical | High | Medium | Low",
-      "gapDescription": "What is missing or insufficient",
-      "evidenceRequired": "Specific evidence needed to close the gap",
-      "recommendation": "Concrete remediation action",
-      "estimatedEffort": "Days | Weeks | Months"
-    }
-  ],
-  "top5Actions": ["Action 1", "Action 2", "Action 3", "Action 4", "Action 5"],
-  "nextStep": "One sentence on why a consultation with ARCReady is the right next move"
-}`,
-
-    iso42001: `You are an expert ISO 42001:2023 AI Management Systems advisor at ARCReady, a Johannesburg-based GRC firm specialising in AI governance for South African listed companies.
-
-Context: South Africa's Cabinet approved a national AI Policy in 2025. Map findings to both ISO 42001:2023 controls and South Africa's AI Policy principles where relevant.
-
-Return exactly this JSON structure, no prose outside it:
-{
-  "frameworkName": "ISO 42001:2023 — AI Management Systems",
-  "executiveSummary": "3-4 sentence summary referencing SA AI Policy alignment",
-  "overallRating": "High Risk | Medium Risk | Low Risk",
-  "overallScore": <number 0-100>,
-  "findings": [
-    {
-      "controlId": "e.g. A.6.1.2",
-      "controlName": "Short control name",
-      "saPolicyPrinciple": "SA AI Policy principle this maps to (or N/A)",
-      "status": "Compliant | Partial | Non-Compliant | Not Assessed",
-      "priority": "Critical | High | Medium | Low",
-      "gapDescription": "What is missing",
-      "evidenceRequired": "Specific evidence needed",
-      "recommendation": "Concrete action",
-      "estimatedEffort": "Days | Weeks | Months"
-    }
-  ],
-  "top5Actions": ["Action 1", "Action 2", "Action 3", "Action 4", "Action 5"],
-  "nextStep": "One sentence on why a consultation with ARCReady is the right next move"
-}`,
-
-    "nist-csf": `You are an expert NIST CSF 2.0 cybersecurity advisor at ARCReady. Assess posture across all six CSF 2.0 functions: Govern, Identify, Protect, Detect, Respond, Recover.
-
-Return exactly this JSON structure, no prose outside it:
-{
-  "frameworkName": "NIST Cybersecurity Framework 2.0",
-  "executiveSummary": "3-4 sentence summary",
-  "overallRating": "High Risk | Medium Risk | Low Risk",
-  "overallScore": <number 0-100>,
-  "findings": [
-    {
-      "controlId": "e.g. GV.RM-01",
-      "controlName": "Short control name",
-      "csfFunction": "Govern | Identify | Protect | Detect | Respond | Recover",
-      "status": "Compliant | Partial | Non-Compliant | Not Assessed",
-      "priority": "Critical | High | Medium | Low",
-      "gapDescription": "What is missing",
-      "evidenceRequired": "Specific evidence needed",
-      "recommendation": "Concrete action",
-      "estimatedEffort": "Days | Weeks | Months"
-    }
-  ],
-  "top5Actions": ["Action 1", "Action 2", "Action 3", "Action 4", "Action 5"],
-  "nextStep": "One sentence on why a consultation with ARCReady is the right next move"
-}`,
-
-    soc2: `You are an expert SOC 2 compliance advisor at ARCReady. Assess readiness against AICPA 2017 Trust Services Criteria with 2022 Revised Points of Focus.
-
-Return exactly this JSON structure, no prose outside it:
-{
-  "frameworkName": "SOC 2 — Trust Services Criteria",
-  "executiveSummary": "3-4 sentence summary",
-  "overallRating": "High Risk | Medium Risk | Low Risk",
-  "overallScore": <number 0-100>,
-  "findings": [
-    {
-      "controlId": "e.g. CC6.1",
-      "controlName": "Short criteria name",
-      "tscCategory": "Security | Availability | Confidentiality | Processing Integrity | Privacy",
-      "status": "Met | Partial | Not Met | Not Assessed",
-      "priority": "Critical | High | Medium | Low",
-      "gapDescription": "What is missing",
-      "evidenceRequired": "Specific evidence needed",
-      "recommendation": "Concrete action",
-      "estimatedEffort": "Days | Weeks | Months"
-    }
-  ],
-  "top5Actions": ["Action 1", "Action 2", "Action 3", "Action 4", "Action 5"],
-  "nextStep": "One sentence on why a consultation with ARCReady is the right next move"
-}`,
-
-    "pci-dss": `You are an expert PCI DSS v4.0.1 compliance advisor at ARCReady. Assess readiness across all 12 PCI DSS requirements.
-
-Return exactly this JSON structure, no prose outside it:
-{
-  "frameworkName": "PCI DSS v4.0.1",
-  "executiveSummary": "3-4 sentence summary",
-  "overallRating": "High Risk | Medium Risk | Low Risk",
-  "overallScore": <number 0-100>,
-  "findings": [
-    {
-      "controlId": "e.g. Req 3.2",
-      "controlName": "Short requirement name",
-      "pciRequirement": "Requirement number",
-      "status": "Compliant | Partial | Non-Compliant | Not Assessed",
-      "priority": "Critical | High | Medium | Low",
-      "gapDescription": "What is missing",
-      "evidenceRequired": "Specific evidence needed",
-      "recommendation": "Concrete action",
-      "estimatedEffort": "Days | Weeks | Months"
-    }
-  ],
-  "top5Actions": ["Action 1", "Action 2", "Action 3", "Action 4", "Action 5"],
-  "nextStep": "One sentence on why a consultation with ARCReady is the right next move"
-}`,
-
-    gdpr: `You are an expert GDPR and POPIA compliance advisor at ARCReady, a Johannesburg-based GRC firm. Assess data protection readiness against both GDPR and South Africa's POPIA where applicable.
-
-Return exactly this JSON structure, no prose outside it:
-{
-  "frameworkName": "GDPR / POPIA — Data Protection",
-  "executiveSummary": "3-4 sentence summary referencing both GDPR and POPIA obligations",
-  "overallRating": "High Risk | Medium Risk | Low Risk",
-  "overallScore": <number 0-100>,
-  "findings": [
-    {
-      "controlId": "e.g. Art.30 / POPIA s.69",
-      "controlName": "Short obligation name",
-      "regulation": "GDPR | POPIA | Both",
-      "status": "Compliant | Partial | Non-Compliant | Not Assessed",
-      "priority": "Critical | High | Medium | Low",
-      "gapDescription": "What is missing",
-      "evidenceRequired": "Specific evidence needed",
-      "recommendation": "Concrete action",
-      "estimatedEffort": "Days | Weeks | Months"
-    }
-  ],
-  "top5Actions": ["Action 1", "Action 2", "Action 3", "Action 4", "Action 5"],
-  "nextStep": "One sentence on why a consultation with ARCReady is the right next move"
-}`,
-  };
-  return prompts[frameworkId] || prompts.iso27001;
-}
-
-function buildUserPrompt(framework, profile, answers) {
-  const answerLines = framework.questions.map((q, i) => {
-    const ans = answers[q.id] || "unsure";
-    const label = ANSWER_OPTIONS.find(o => o.value === ans)?.label || ans;
-    return `Q${i + 1}: ${q.text}\nAnswer: ${label}`;
-  }).join("\n\n");
-
-  return `Client profile:
-- Company: ${profile.company}
-- Industry: ${profile.industry}
-- Size: ${profile.size}
-- Framework: ${framework.name}
-
-Control self-assessment responses:
-${answerLines}
-
-Produce the gap analysis JSON now. Be specific to the industry context. Flag Critical priority items prominently. All findings must be actionable.`;
-}
-
-// ─── Supabase lead save (lightweight fetch, no SDK needed) ────────────────────
-function buildRuleBasedReport(framework, profile, answers) {
-  const answerWeights = { yes: 100, partial: 60, no: 20, unsure: 40 };
-  const answerStatus = {
-    yes: "Compliant",
-    partial: "Partial",
-    no: "Non-Compliant",
-    unsure: "Not Assessed",
-  };
-  const priorityOrder = { Critical: 0, High: 1, Medium: 2, Low: 3 };
-
-  function getPriority(answer, index) {
-    if (answer === "no") return index < 4 ? "Critical" : "High";
-    if (answer === "partial") return index < 4 ? "High" : "Medium";
-    if (answer === "unsure") return "Medium";
-    return "Low";
+  function checkPage(needed = 20) {
+    if (y + needed > 272) { doc.addPage(); y = 20; }
   }
 
-  function getEffort(answer) {
-    if (answer === "no") return "Weeks";
-    if (answer === "partial") return "Days";
-    if (answer === "unsure") return "Days";
-    return "Days";
+  function header() {
+    // Navy header bar
+    doc.setFillColor(27, 52, 97);
+    doc.rect(0, 0, W, 36, "F");
+    doc.setTextColor(191, 160, 106);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.text("ARCREADY · AUDIT. RISK. COMPLIANCE.", margin, 12);
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.text("Control Self-Assessment Report", margin, 23);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(180, 180, 180);
+    doc.text(`${profile.company} · ${profile.industry} · ${new Date().toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })}`, margin, 31);
+    y = 46;
   }
 
-  function getRecommendation(question, answer) {
-    if (answer === "yes") {
-      return "Maintain the control, preserve evidence, and keep it in the regular review cycle.";
-    }
-    if (answer === "partial") {
-      return `Formalise, document, and fully evidence this control area: ${question.text}`;
-    }
-    if (answer === "unsure") {
-      return `Confirm control ownership and perform an evidence review for: ${question.text}`;
-    }
-    return `Design and implement a documented control response for: ${question.text}`;
-  }
+  header();
 
-  const findings = framework.questions
-    .map((question, index) => {
-      const answer = answers[question.id] || "unsure";
-      if (answer === "yes") return null;
+  // Cover summary
+  doc.setTextColor(27, 52, 97);
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.text("Assessment Overview", margin, y);
+  y += 7;
 
-      return {
-        controlId: `${framework.name} Q${index + 1}`,
-        controlName: question.text.replace(/\s*\([^)]*\)\s*$/u, ""),
-        status: answerStatus[answer],
-        priority: getPriority(answer, index),
-        gapDescription:
-          answer === "partial"
-            ? "This control appears to exist, but the response suggests design, documentation, or operating evidence gaps remain."
-            : answer === "unsure"
-              ? "The organisation could not confirm whether this control is operating effectively, creating uncertainty against the framework."
-              : "This control does not appear to be implemented based on the submitted response.",
-        evidenceRequired: `Provide policy, procedure, ownership, and operating evidence for: ${question.text}`,
-        recommendation: getRecommendation(question, answer),
-        estimatedEffort: getEffort(answer),
-      };
-    })
-    .filter(Boolean);
+  doc.setDrawColor(164, 132, 74);
+  doc.setLineWidth(0.5);
+  doc.line(margin, y, W - margin, y);
+  y += 6;
 
-  const scores = framework.questions.map((question) => {
-    const answer = answers[question.id] || "unsure";
-    return answerWeights[answer] ?? 40;
-  });
-  const overallScore = Math.round(scores.reduce((sum, value) => sum + value, 0) / scores.length);
-  const criticalCount = findings.filter(f => f.priority === "Critical").length;
-  const highCount = findings.filter(f => f.priority === "High").length;
-  const implementedCount = framework.questions.filter((question) => (answers[question.id] || "unsure") === "yes").length;
-  const partialCount = framework.questions.filter((question) => (answers[question.id] || "unsure") === "partial").length;
-
-  const overallRating = overallScore >= 75 && criticalCount === 0
-    ? "Low Risk"
-    : overallScore >= 50 && criticalCount < 2
-      ? "Medium Risk"
-      : "High Risk";
-
-  const top5Actions = findings
-    .slice()
-    .sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
-    .slice(0, 5)
-    .map(f => f.recommendation);
-
-  return {
-    frameworkName: framework.name,
-    executiveSummary: `${profile.company} was assessed against ${framework.name} using ${framework.questions.length} control questions. ${implementedCount} controls were confirmed as fully in place, ${partialCount} were partially in place, and ${findings.length - partialCount} were either missing or not evidenced. Based on the submitted responses, the current posture is rated ${overallRating.toLowerCase()} with an overall score of ${overallScore}/100.`,
-    overallRating,
-    overallScore,
-    findings,
-    top5Actions,
-    nextStep: criticalCount + highCount > 0
-      ? "Use this assessment to prioritise remediation, then engage ARCReady to validate evidence and close the highest-risk gaps."
-      : "Your responses indicate a stronger control posture; ARCReady can help validate evidence and prepare you for formal review.",
-  };
-}
-
-async function saveLead(profile, frameworks, answers, reports) {
-  const payload = {
-    name: profile.name,
-    company: profile.company,
-    email: profile.email,
-    phone: profile.phone || null,
-    industry: profile.industry,
-    size: profile.size,
-    frameworks,
-    answers,
-    report: reports,
-  };
-
-  const serverRes = await fetch("/api/lead", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
+  const summaryData = selectedFrameworks.map(fwId => {
+    const fw = FRAMEWORKS.find(f => f.id === fwId);
+    const r = reports[fwId];
+    return [fw?.name || fwId, r?.overallScore?.toString() || "—", r?.overallRating || "—", (r?.findings?.filter(f => f.priority === "Critical")?.length || 0).toString()];
   });
 
-  if (serverRes.ok) return;
+  // Summary table
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setFillColor(27, 52, 97);
+  doc.rect(margin, y, contentW, 8, "F");
+  doc.setTextColor(255, 255, 255);
+  const cols = [60, 25, 60, 30];
+  const headers = ["Framework", "Score", "Rating", "Critical"];
+  let x = margin + 3;
+  headers.forEach((h, i) => { doc.text(h, x, y + 5.5); x += cols[i]; });
+  y += 8;
 
-  const serverText = await serverRes.text();
-  const url = import.meta.env.VITE_SUPABASE_URL;
-  const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-  if (!url || !key || url.includes("supabase.com/dashboard")) {
-    throw new Error(serverText || "Lead save failed and no direct Supabase fallback is configured.");
-  }
-
-  const fallbackRes = await fetch(`${url}/rest/v1/assessment_leads`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "apikey": key,
-      "Authorization": `Bearer ${key}`,
-      "Prefer": "return=minimal",
-    },
-    body: JSON.stringify(payload),
+  summaryData.forEach((row, ri) => {
+    doc.setFillColor(ri % 2 === 0 ? 248 : 255, ri % 2 === 0 ? 245 : 255, ri % 2 === 0 ? 240 : 255);
+    doc.rect(margin, y, contentW, 7, "F");
+    doc.setTextColor(44, 50, 64);
+    doc.setFont("helvetica", "normal");
+    x = margin + 3;
+    row.forEach((cell, i) => {
+      if (i === 2) {
+        const ratingColor = cell === "High Risk" ? [153, 27, 27] : cell === "Medium Risk" ? [146, 64, 14] : [22, 101, 52];
+        doc.setTextColor(...ratingColor);
+        doc.setFont("helvetica", "bold");
+      } else {
+        doc.setTextColor(44, 50, 64);
+        doc.setFont("helvetica", "normal");
+      }
+      doc.text(cell, x, y + 5);
+      x += cols[i];
+    });
+    y += 7;
   });
+  y += 10;
 
-  if (!fallbackRes.ok) {
-    const fallbackText = await fallbackRes.text();
-    throw new Error(fallbackText || serverText || "Lead save failed.");
+  // Per-framework sections
+  for (const fwId of selectedFrameworks) {
+    const fw = FRAMEWORKS.find(f => f.id === fwId);
+    const report = reports[fwId];
+    if (!report || !report.findings?.length) continue;
+
+    checkPage(40);
+    doc.addPage();
+    header();
+
+    // Framework title
+    doc.setFillColor(27, 52, 97);
+    doc.rect(margin, y, contentW, 12, "F");
+    doc.setTextColor(191, 160, 106);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.text(fw.name.toUpperCase(), margin + 3, y + 5);
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(11);
+    doc.text("Gap Analysis Report", margin + 3, y + 10);
+    y += 18;
+
+    // Score + rating
+    const scoreColor = report.overallScore >= 70 ? [22, 101, 52] : report.overallScore >= 40 ? [146, 64, 14] : [153, 27, 27];
+    doc.setFontSize(28);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...scoreColor);
+    doc.text(report.overallScore.toString(), margin, y + 10);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(92, 96, 112);
+    doc.text("Overall Score", margin, y + 15);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...scoreColor);
+    doc.text(report.overallRating, margin + 30, y + 10);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(92, 96, 112);
+    doc.text(`Maturity: ${report.maturityLevel || "—"}`, margin + 30, y + 15);
+    y += 22;
+
+    // Executive summary
+    checkPage(30);
+    doc.setFillColor(248, 245, 240);
+    doc.setDrawColor(164, 132, 74);
+    doc.setLineWidth(0.8);
+    doc.line(margin, y, margin, y + 20);
+    doc.setTextColor(164, 132, 74);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.text("EXECUTIVE SUMMARY", margin + 3, y + 5);
+    doc.setTextColor(44, 50, 64);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    const summaryLines = doc.splitTextToSize(report.executiveSummary || "", contentW - 8);
+    summaryLines.forEach((line, i) => { doc.text(line, margin + 3, y + 11 + i * 5); });
+    y += 14 + summaryLines.length * 5;
+
+    // Top 5 actions
+    checkPage(40);
+    y += 6;
+    doc.setTextColor(27, 52, 97);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text("Top 5 Priority Actions", margin, y);
+    y += 6;
+    (report.top5Actions || []).forEach((action, i) => {
+      checkPage(8);
+      doc.setFillColor(27, 52, 97);
+      doc.circle(margin + 3, y + 2, 2.5, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(7);
+      doc.text((i + 1).toString(), margin + 3, y + 2.8, { align: "center" });
+      doc.setTextColor(44, 50, 64);
+      doc.setFontSize(8.5);
+      doc.setFont("helvetica", "normal");
+      const lines = doc.splitTextToSize(action, contentW - 10);
+      lines.forEach((line, li) => { doc.text(line, margin + 9, y + 3 + li * 4.5); });
+      y += 4 + lines.length * 4.5;
+    });
+    y += 6;
+
+    // Findings table
+    checkPage(20);
+    doc.setTextColor(27, 52, 97);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Detailed Findings (${report.findings.length} controls assessed)`, margin, y);
+    y += 6;
+
+    const fCols = [22, 45, 22, 22, 65];
+    const fHeaders = ["Control ID", "Control Name", "Priority", "Status", "Recommendation"];
+
+    doc.setFillColor(27, 52, 97);
+    doc.rect(margin, y, contentW, 8, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    x = margin + 2;
+    fHeaders.forEach((h, i) => { doc.text(h, x, y + 5.5); x += fCols[i]; });
+    y += 8;
+
+    for (const [ri, finding] of (report.findings || []).entries()) {
+      const rowH = Math.max(10, doc.splitTextToSize(finding.recommendation || "", fCols[4] - 4).length * 4 + 4);
+      checkPage(rowH + 2);
+
+      doc.setFillColor(ri % 2 === 0 ? 248 : 255, ri % 2 === 0 ? 245 : 255, ri % 2 === 0 ? 240 : 255);
+      doc.rect(margin, y, contentW, rowH, "F");
+
+      x = margin + 2;
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(27, 52, 97);
+      doc.text(finding.controlId || "", x, y + 5);
+      x += fCols[0];
+
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(44, 50, 64);
+      const nameLines = doc.splitTextToSize(finding.controlName || "", fCols[1] - 4);
+      nameLines.forEach((l, li) => doc.text(l, x, y + 4 + li * 3.8));
+      x += fCols[1];
+
+      const pColors = { Critical: [159,18,57], High: [153,27,27], Medium: [146,64,14], Low: [22,101,52] };
+      const pBgs = { Critical: [254,205,211], High: [254,226,226], Medium: [254,243,199], Low: [220,252,231] };
+      const pc = pColors[finding.priority] || [55,65,81];
+      const pb = pBgs[finding.priority] || [243,244,246];
+      doc.setFillColor(...pb);
+      doc.roundedRect(x, y + 2, fCols[2] - 4, 5, 1, 1, "F");
+      doc.setTextColor(...pc);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(6.5);
+      doc.text(finding.priority || "", x + (fCols[2] - 4) / 2, y + 5.5, { align: "center" });
+      x += fCols[2];
+
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(44, 50, 64);
+      doc.setFontSize(7);
+      doc.text(finding.status || "", x, y + 5);
+      x += fCols[3];
+
+      const recLines = doc.splitTextToSize(finding.recommendation || "", fCols[4] - 4);
+      recLines.forEach((l, li) => doc.text(l, x, y + 4 + li * 3.8));
+
+      y += rowH;
+    }
+
+    // Remediation timeline
+    if (report.estimatedRemediationTimeline) {
+      checkPage(16);
+      y += 6;
+      doc.setFillColor(240, 249, 255);
+      doc.rect(margin, y, contentW, 12, "F");
+      doc.setTextColor(27, 52, 97);
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "bold");
+      doc.text("ESTIMATED REMEDIATION TIMELINE", margin + 3, y + 5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(44, 50, 64);
+      doc.setFontSize(8.5);
+      doc.text(report.estimatedRemediationTimeline, margin + 3, y + 10);
+      y += 16;
+    }
   }
+
+  // Final CTA page
+  doc.addPage();
+  doc.setFillColor(27, 52, 97);
+  doc.rect(0, 0, W, 297, "F");
+  doc.setTextColor(191, 160, 106);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.text("ARCREADY · AUDIT. RISK. COMPLIANCE.", W / 2, 80, { align: "center" });
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(22);
+  doc.text("Ready to act on these findings?", W / 2, 110, { align: "center" });
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(180, 180, 180);
+  const ctaText = doc.splitTextToSize("Book a free 30-minute consultation with Michael Mokadi CA(SA) to walk through your results and build a prioritised remediation roadmap.", 140);
+  ctaText.forEach((line, i) => doc.text(line, W / 2, 126 + i * 7, { align: "center" }));
+  doc.setFillColor(164, 132, 74);
+  doc.roundedRect(W / 2 - 40, 155, 80, 14, 3, 3, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.text("www.arcready.co.za", W / 2, 164, { align: "center" });
+  doc.setTextColor(191, 160, 106);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.text("hello@arcready.co.za", W / 2, 185, { align: "center" });
+  doc.setTextColor(100, 100, 100);
+  doc.setFontSize(8);
+  doc.text('"Know where you stand before they arrive."', W / 2, 260, { align: "center" });
+
+  doc.save(`ARCReady_Assessment_${profile.company.replace(/[^a-z0-9]/gi, "_")}_${new Date().toISOString().split("T")[0]}.pdf`);
 }
 
-// ─── Status badge colours ─────────────────────────────────────────────────────
-function statusBadge(status) {
+// ─── Status helpers ───────────────────────────────────────────────────────────
+function statusStyle(status) {
   const map = {
-    "Compliant":      { bg: "#dcfce7", color: "#166534", label: "Compliant" },
-    "Met":            { bg: "#dcfce7", color: "#166534", label: "Met" },
-    "Partial":        { bg: "#fef3c7", color: "#92400e", label: "Partial" },
-    "Non-Compliant":  { bg: "#fee2e2", color: "#991b1b", label: "Non-Compliant" },
-    "Not Met":        { bg: "#fee2e2", color: "#991b1b", label: "Not Met" },
-    "Not Assessed":   { bg: "#f3f4f6", color: "#374151", label: "Not Assessed" },
+    "Compliant":     { bg: "#dcfce7", color: "#166534" },
+    "Met":           { bg: "#dcfce7", color: "#166534" },
+    "Partial":       { bg: "#fef3c7", color: "#92400e" },
+    "Non-Compliant": { bg: "#fee2e2", color: "#991b1b" },
+    "Not Met":       { bg: "#fee2e2", color: "#991b1b" },
+    "Not Assessed":  { bg: "#f3f4f6", color: "#374151" },
   };
   return map[status] || map["Not Assessed"];
 }
 
-function priorityBadge(priority) {
+function priorityStyle(priority) {
   const map = {
     "Critical": { bg: "#fecdd3", color: "#9f1239" },
     "High":     { bg: "#fee2e2", color: "#991b1b" },
@@ -533,10 +465,10 @@ function priorityBadge(priority) {
 }
 
 // ─── Score ring ───────────────────────────────────────────────────────────────
-function ScoreRing({ score, size = 80 }) {
+function ScoreRing({ score, size = 72 }) {
   const r = (size - 8) / 2;
   const circ = 2 * Math.PI * r;
-  const dash = (score / 100) * circ;
+  const dash = ((score || 0) / 100) * circ;
   const color = score >= 70 ? "#166534" : score >= 40 ? "#92400e" : "#991b1b";
   return (
     <svg width={size} height={size} style={{ flexShrink: 0 }}>
@@ -544,73 +476,62 @@ function ScoreRing({ score, size = 80 }) {
       <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth="7"
         strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
         transform={`rotate(-90 ${size/2} ${size/2})`}/>
-      <text x={size/2} y={size/2 + 1} textAnchor="middle" dominantBaseline="central"
-        fontSize="14" fontWeight="700" fill={color}>{score}</text>
+      <text x={size/2} y={size/2+1} textAnchor="middle" dominantBaseline="central"
+        fontSize="13" fontWeight="700" fill={color}>{score || 0}</text>
     </svg>
   );
 }
 
 // ─── Recommendations Tracker ──────────────────────────────────────────────────
 function RecommendationsTracker({ findings }) {
-  const [tracker, setTracker] = useState(() =>
+  const [rows, setRows] = useState(() =>
     findings.map(f => ({ ...f, owner: "", dueDate: "", evidenceNote: "", trackerStatus: "Open" }))
   );
-
-  function update(i, field, value) {
-    setTracker(t => t.map((row, idx) => idx === i ? { ...row, [field]: value } : row));
-  }
-
-  const trackerStatuses = ["Open", "In Progress", "Evidence Collected", "Closed"];
+  const update = (i, field, value) =>
+    setRows(r => r.map((row, idx) => idx === i ? { ...row, [field]: value } : row));
 
   return (
-    <div style={{ marginTop: 24 }}>
-      <h3 style={{ fontSize: 16, fontWeight: 600, color: ROYAL_BLUE, marginBottom: 12 }}>
-        Recommendations Tracker
-      </h3>
-      <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>
-        Assign owners, set due dates, and track evidence collection for each finding.
-        Export or screenshot to share with your team.
+    <div style={{ marginTop: 20 }}>
+      <h3 style={{ fontSize: 15, fontWeight: 600, color: ROYAL_BLUE, marginBottom: 8 }}>Recommendations Tracker</h3>
+      <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 14 }}>
+        Assign owners, set due dates, and track evidence for each finding.
       </p>
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
           <thead>
             <tr style={{ background: ROYAL_BLUE, color: "#fff" }}>
-              {["Control", "Priority", "Recommendation", "Owner", "Due Date", "Evidence Note", "Status"].map(h => (
-                <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>{h}</th>
+              {["Control","Priority","Recommendation","Owner","Due Date","Evidence","Status"].map(h => (
+                <th key={h} style={{ padding: "7px 10px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap", fontSize: 11 }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {tracker.map((row, i) => {
-              const p = priorityBadge(row.priority);
+            {rows.map((row, i) => {
+              const p = priorityStyle(row.priority);
               return (
                 <tr key={i} style={{ borderBottom: "1px solid #f3f4f6", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
-                  <td style={{ padding: "8px 10px", fontWeight: 500, color: ROYAL_BLUE, whiteSpace: "nowrap" }}>{row.controlId}</td>
-                  <td style={{ padding: "8px 10px" }}>
-                    <span style={{ background: p.bg, color: p.color, padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600 }}>
-                      {row.priority}
-                    </span>
+                  <td style={{ padding: "7px 10px", fontWeight: 600, color: ROYAL_BLUE, whiteSpace: "nowrap", fontSize: 11 }}>{row.controlId}</td>
+                  <td style={{ padding: "7px 10px" }}>
+                    <span style={{ background: p.bg, color: p.color, padding: "2px 7px", borderRadius: 4, fontSize: 10, fontWeight: 600 }}>{row.priority}</span>
                   </td>
-                  <td style={{ padding: "8px 10px", color: "#374151", maxWidth: 220 }}>{row.recommendation}</td>
-                  <td style={{ padding: "8px 4px" }}>
-                    <input value={row.owner} onChange={e => update(i, "owner", e.target.value)}
-                      placeholder="Assign…"
-                      style={{ border: "1px solid #e5e7eb", borderRadius: 4, padding: "4px 8px", fontSize: 12, width: 100 }}/>
+                  <td style={{ padding: "7px 10px", color: "#374151", maxWidth: 200, fontSize: 11 }}>{row.recommendation}</td>
+                  <td style={{ padding: "7px 4px" }}>
+                    <input value={row.owner} onChange={e => update(i, "owner", e.target.value)} placeholder="Assign…"
+                      style={{ border: "1px solid #e5e7eb", borderRadius: 4, padding: "3px 7px", fontSize: 11, width: 90 }}/>
                   </td>
-                  <td style={{ padding: "8px 4px" }}>
+                  <td style={{ padding: "7px 4px" }}>
                     <input type="date" value={row.dueDate} onChange={e => update(i, "dueDate", e.target.value)}
-                      style={{ border: "1px solid #e5e7eb", borderRadius: 4, padding: "4px 6px", fontSize: 12, width: 120 }}/>
+                      style={{ border: "1px solid #e5e7eb", borderRadius: 4, padding: "3px 6px", fontSize: 11, width: 115 }}/>
                   </td>
-                  <td style={{ padding: "8px 4px" }}>
-                    <input value={row.evidenceNote} onChange={e => update(i, "evidenceNote", e.target.value)}
-                      placeholder="Evidence collected…"
-                      style={{ border: "1px solid #e5e7eb", borderRadius: 4, padding: "4px 8px", fontSize: 12, width: 140 }}/>
+                  <td style={{ padding: "7px 4px" }}>
+                    <input value={row.evidenceNote} onChange={e => update(i, "evidenceNote", e.target.value)} placeholder="Evidence…"
+                      style={{ border: "1px solid #e5e7eb", borderRadius: 4, padding: "3px 7px", fontSize: 11, width: 130 }}/>
                   </td>
-                  <td style={{ padding: "8px 4px" }}>
+                  <td style={{ padding: "7px 4px" }}>
                     <select value={row.trackerStatus} onChange={e => update(i, "trackerStatus", e.target.value)}
-                      style={{ border: "1px solid #e5e7eb", borderRadius: 4, padding: "4px 6px", fontSize: 12,
+                      style={{ border: "1px solid #e5e7eb", borderRadius: 4, padding: "3px 6px", fontSize: 11,
                         color: row.trackerStatus === "Closed" ? "#166534" : row.trackerStatus === "In Progress" ? "#92400e" : "#374151" }}>
-                      {trackerStatuses.map(s => <option key={s}>{s}</option>)}
+                      {["Open","In Progress","Evidence Collected","Closed"].map(s => <option key={s}>{s}</option>)}
                     </select>
                   </td>
                 </tr>
@@ -623,129 +544,98 @@ function RecommendationsTracker({ findings }) {
   );
 }
 
-// ─── Single framework report card ─────────────────────────────────────────────
-function ReportCard({ report }) {
+// ─── Report Card ──────────────────────────────────────────────────────────────
+function ReportCard({ report, framework }) {
   const [expanded, setExpanded] = useState(null);
   const [showTracker, setShowTracker] = useState(false);
-
   const findings = report.findings || [];
-  const criticalCount  = findings.filter(f => f.priority === "Critical").length;
-  const highCount      = findings.filter(f => f.priority === "High").length;
-  const compliantCount = findings.filter(f => ["Compliant","Met"].includes(f.status)).length;
-
-  const ratingColor = {
-    "High Risk":   "#991b1b",
-    "Medium Risk": "#92400e",
-    "Low Risk":    "#166534",
-  }[report.overallRating] || "#374151";
+  const critical = findings.filter(f => f.priority === "Critical").length;
+  const high     = findings.filter(f => f.priority === "High").length;
+  const compliant = findings.filter(f => ["Compliant","Met"].includes(f.status)).length;
+  const rColor = { "High Risk":"#991b1b","Medium Risk":"#92400e","Low Risk":"#166534" }[report.overallRating] || "#374151";
 
   return (
-    <div style={{ background: "#fff", border: `1px solid #e5e7eb`, borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
-      {/* Report header */}
-      <div style={{ background: ROYAL_BLUE, padding: "20px 24px", display: "flex", alignItems: "center", gap: 16 }}>
-        <ScoreRing score={report.overallScore} size={72}/>
+    <div style={{ background: "#fff", border: "1px solid #e8dfd0", borderRadius: 10, overflow: "hidden", marginBottom: 20 }}>
+      <div style={{ background: ROYAL_BLUE, padding: "18px 22px", display: "flex", alignItems: "center", gap: 14 }}>
+        <ScoreRing score={report.overallScore}/>
         <div style={{ flex: 1 }}>
-          <div style={{ color: LIGHT_GOLD, fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>
+          <div style={{ color: GOLD_LIGHT, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 3 }}>
             {report.frameworkName}
           </div>
-          <div style={{ color: "#fff", fontSize: 20, fontWeight: 700, marginBottom: 6 }}>
-            Gap Analysis Report
-          </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <span style={{ background: ratingColor, color: "#fff", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>
-              {report.overallRating}
-            </span>
-            {criticalCount > 0 && (
-              <span style={{ background: "#fecdd3", color: "#9f1239", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>
-                {criticalCount} Critical
-              </span>
-            )}
-            {highCount > 0 && (
-              <span style={{ background: "#fee2e2", color: "#991b1b", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>
-                {highCount} High
-              </span>
-            )}
-            <span style={{ background: "#dcfce7", color: "#166534", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>
-              {compliantCount} Compliant
-            </span>
+          <div style={{ color: "#fff", fontSize: 18, fontWeight: 800, marginBottom: 5 }}>Gap Analysis Report</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <span style={{ background: rColor, color: "#fff", padding: "2px 10px", borderRadius: 20, fontSize: 10, fontWeight: 600 }}>{report.overallRating}</span>
+            {report.maturityLevel && <span style={{ background: "rgba(255,255,255,0.15)", color: "#fff", padding: "2px 10px", borderRadius: 20, fontSize: 10 }}>{report.maturityLevel}</span>}
+            {critical > 0 && <span style={{ background: "#fecdd3", color: "#9f1239", padding: "2px 10px", borderRadius: 20, fontSize: 10, fontWeight: 600 }}>{critical} Critical</span>}
+            {high > 0 && <span style={{ background: "#fee2e2", color: "#991b1b", padding: "2px 10px", borderRadius: 20, fontSize: 10, fontWeight: 600 }}>{high} High</span>}
+            <span style={{ background: "#dcfce7", color: "#166534", padding: "2px 10px", borderRadius: 20, fontSize: 10, fontWeight: 600 }}>{compliant} Compliant</span>
           </div>
         </div>
       </div>
 
-      <div style={{ padding: "20px 24px" }}>
+      <div style={{ padding: "18px 22px" }}>
         {/* Executive summary */}
-        <div style={{ background: OFF_WHITE, borderLeft: `4px solid ${MATTE_GOLD}`, padding: "12px 16px", borderRadius: "0 8px 8px 0", marginBottom: 20 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: MATTE_GOLD, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
-            Executive Summary
-          </div>
-          <p style={{ fontSize: 14, color: "#374151", lineHeight: 1.6, margin: 0 }}>{report.executiveSummary}</p>
+        <div style={{ background: OFF_WHITE, borderLeft: `4px solid ${MATTE_GOLD}`, padding: "12px 16px", borderRadius: "0 6px 6px 0", marginBottom: 18 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: MATTE_GOLD, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 5 }}>Executive Summary</div>
+          <p style={{ fontSize: 13, color: "#374151", lineHeight: 1.65, margin: 0 }}>{report.executiveSummary}</p>
         </div>
 
-        {/* Top 5 actions */}
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: ROYAL_BLUE, marginBottom: 10 }}>
-            Top 5 Priority Actions
+        {/* Top 5 */}
+        {(report.top5Actions||[]).length > 0 && (
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: ROYAL_BLUE, marginBottom: 8 }}>Top 5 Priority Actions</div>
+            <ol style={{ margin: 0, paddingLeft: 20 }}>
+              {(report.top5Actions||[]).map((a,i) => (
+                <li key={i} style={{ fontSize: 13, color: "#374151", marginBottom: 5, lineHeight: 1.5 }}>{a}</li>
+              ))}
+            </ol>
           </div>
-          <ol style={{ margin: 0, paddingLeft: 20 }}>
-            {(report.top5Actions || []).map((action, i) => (
-              <li key={i} style={{ fontSize: 13, color: "#374151", marginBottom: 6, lineHeight: 1.5 }}>{action}</li>
-            ))}
-          </ol>
-        </div>
+        )}
 
-        {/* Findings table */}
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: ROYAL_BLUE, marginBottom: 10 }}>
-            Detailed Findings ({report.findings.length} controls assessed)
+        {/* Findings */}
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: ROYAL_BLUE, marginBottom: 8 }}>
+            Detailed Findings ({findings.length} controls assessed)
           </div>
-          {(report.findings || []).map((f, i) => {
-            const sb = statusBadge(f.status);
-            const pb = priorityBadge(f.priority);
-            const isOpen = expanded === i;
+          {findings.map((f, i) => {
+            const sb = statusStyle(f.status);
+            const pb = priorityStyle(f.priority);
+            const open = expanded === i;
             return (
-              <div key={i} style={{ border: "1px solid #e5e7eb", borderRadius: 8, marginBottom: 8, overflow: "hidden" }}>
-                <button onClick={() => setExpanded(isOpen ? null : i)}
-                  style={{ width: "100%", background: isOpen ? "#f8f6f1" : "#fff", border: "none", cursor: "pointer",
-                    padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, textAlign: "left" }}>
-                  <span style={{ fontWeight: 700, color: ROYAL_BLUE, fontSize: 12, minWidth: 64 }}>{f.controlId}</span>
-                  <span style={{ flex: 1, fontSize: 13, color: "#374151", fontWeight: 500 }}>{f.controlName}</span>
-                  <span style={{ background: pb.bg, color: pb.color, padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>
-                    {f.priority}
-                  </span>
-                  <span style={{ background: sb.bg, color: sb.color, padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>
-                    {sb.label}
-                  </span>
-                  <span style={{ color: "#9ca3af", fontSize: 12 }}>{isOpen ? "▲" : "▼"}</span>
+              <div key={i} style={{ border: "1px solid #e8dfd0", borderRadius: 6, marginBottom: 6, overflow: "hidden" }}>
+                <button onClick={() => setExpanded(open ? null : i)}
+                  style={{ width: "100%", background: open ? OFF_WHITE : "#fff", border: "none", cursor: "pointer",
+                    padding: "10px 14px", display: "flex", alignItems: "center", gap: 8, textAlign: "left" }}>
+                  <span style={{ fontWeight: 700, color: ROYAL_BLUE, fontSize: 11, minWidth: 60 }}>{f.controlId}</span>
+                  <span style={{ flex: 1, fontSize: 12, color: "#374151", fontWeight: 500 }}>{f.controlName}</span>
+                  <span style={{ background: pb.bg, color: pb.color, padding: "2px 7px", borderRadius: 4, fontSize: 10, fontWeight: 600, whiteSpace: "nowrap" }}>{f.priority}</span>
+                  <span style={{ background: sb.bg, color: sb.color, padding: "2px 7px", borderRadius: 4, fontSize: 10, fontWeight: 600, whiteSpace: "nowrap" }}>{f.status}</span>
+                  <span style={{ color: "#9ca3af", fontSize: 11 }}>{open ? "▲" : "▼"}</span>
                 </button>
-                {isOpen && (
-                  <div style={{ padding: "0 16px 14px", background: "#fafafa" }}>
-                    {f.saPolicyPrinciple && f.saPolicyPrinciple !== "N/A" && (
-                      <div style={{ marginBottom: 10, padding: "6px 10px", background: "#eff6ff", borderRadius: 6, fontSize: 12, color: "#1e40af" }}>
-                        <strong>SA AI Policy alignment:</strong> {f.saPolicyPrinciple}
+                {open && (
+                  <div style={{ padding: "0 14px 12px", background: "#fafafa" }}>
+                    {f.saPolicyPrinciple && (
+                      <div style={{ margin: "8px 0", padding: "5px 10px", background: "#eff6ff", borderRadius: 4, fontSize: 11, color: "#1e40af" }}>
+                        <strong>SA AI Policy:</strong> {f.saPolicyPrinciple}
                       </div>
                     )}
-                    {f.csfFunction && (
-                      <div style={{ marginBottom: 10, padding: "6px 10px", background: "#f0fdf4", borderRadius: 6, fontSize: 12, color: "#166534" }}>
-                        <strong>CSF Function:</strong> {f.csfFunction}
+                    {f.regulatoryRisk && (
+                      <div style={{ margin: "6px 0", padding: "5px 10px", background: "#fff7ed", borderRadius: 4, fontSize: 11, color: "#92400e" }}>
+                        <strong>Regulatory risk:</strong> {f.regulatoryRisk}
                       </div>
                     )}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8 }}>
-                      <div>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", marginBottom: 4 }}>Gap</div>
-                        <p style={{ fontSize: 13, color: "#374151", margin: 0, lineHeight: 1.5 }}>{f.gapDescription}</p>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", marginBottom: 4 }}>Evidence Required</div>
-                        <p style={{ fontSize: 13, color: "#374151", margin: 0, lineHeight: 1.5 }}>{f.evidenceRequired}</p>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", marginBottom: 4 }}>Recommendation</div>
-                        <p style={{ fontSize: 13, color: "#374151", margin: 0, lineHeight: 1.5 }}>{f.recommendation}</p>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", marginBottom: 4 }}>Estimated Effort</div>
-                        <p style={{ fontSize: 13, color: "#374151", margin: 0 }}>{f.estimatedEffort}</p>
-                      </div>
+                      {[
+                        ["Gap", f.gapDescription],
+                        ["Evidence Required", f.evidenceRequired],
+                        ["Recommendation", f.recommendation],
+                        ["Estimated Effort", f.estimatedEffort],
+                      ].map(([label, value]) => (
+                        <div key={label}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", marginBottom: 3 }}>{label}</div>
+                          <p style={{ fontSize: 12, color: "#374151", margin: 0, lineHeight: 1.5 }}>{value}</p>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -754,302 +644,263 @@ function ReportCard({ report }) {
           })}
         </div>
 
-        {/* Tracker toggle */}
+        {report.estimatedRemediationTimeline && (
+          <div style={{ background: "#eff6ff", border: "1px solid #bae6fd", borderRadius: 6, padding: "10px 14px", marginBottom: 18, fontSize: 13, color: "#0369a1" }}>
+            <strong>Estimated timeline to baseline compliance:</strong> {report.estimatedRemediationTimeline}
+          </div>
+        )}
+
         <button onClick={() => setShowTracker(s => !s)}
           style={{ background: showTracker ? "#f3f4f6" : ROYAL_BLUE, color: showTracker ? ROYAL_BLUE : "#fff",
-            border: `1px solid ${ROYAL_BLUE}`, borderRadius: 8, padding: "10px 20px",
-            fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: showTracker ? 0 : 0 }}>
+            border: `1px solid ${ROYAL_BLUE}`, borderRadius: 6, padding: "9px 18px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
           {showTracker ? "Hide Tracker" : "Open Recommendations Tracker →"}
         </button>
-
-        {showTracker && <RecommendationsTracker findings={report.findings || []} />}
+        {showTracker && findings.length > 0 && <RecommendationsTracker findings={findings}/>}
       </div>
     </div>
   );
 }
 
-// ─── Main component ────────────────────────────────────────────────────────────
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function AssessmentTool() {
-  const [step, setStep]             = useState(0); // 0=scope, 1=profile, 2=questions, 3=loading, 4=results
-  const [selectedFrameworks, setSF] = useState([]);
-  const [currentFW, setCurrentFW]   = useState(0); // index into selectedFrameworks during questions
-  const [answers, setAnswers]       = useState({}); // { frameworkId: { qId: value } }
-  const [profile, setProfile]       = useState({ name: "", company: "", email: "", phone: "", industry: "", size: "" });
+  const [step, setStep]             = useState(0);
+  const [selectedFWs, setSFWs]      = useState([]);
+  const [currentFW, setCurrentFW]   = useState(0);
+  const [answers, setAnswers]       = useState({});
+  const [profile, setProfile]       = useState({ name:"", company:"", email:"", phone:"", industry:"", size:"" });
   const [profileErrors, setPE]      = useState({});
-  const [reports, setReports]       = useState({}); // { frameworkId: parsedReport }
+  const [reports, setReports]       = useState({});
   const [loadingMsg, setLoadingMsg] = useState("");
+  const [loadingErrors, setLErrors] = useState([]);
   const [activeReport, setAR]       = useState(null);
-  const [assessmentError, setAssessmentError] = useState("");
+  const [pdfGenerating, setPDF]     = useState(false);
   const topRef = useRef(null);
 
-  function scrollTop() { topRef.current?.scrollIntoView({ behavior: "smooth" }); }
+  const scrollTop = () => topRef.current?.scrollIntoView({ behavior: "smooth" });
 
-  function toggleFramework(id) {
-    setSF(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
-  }
-
-  function setAnswer(fwId, qId, value) {
-    setAnswers(prev => ({ ...prev, [fwId]: { ...(prev[fwId] || {}), [qId]: value } }));
-  }
+  function toggleFW(id) { setSFWs(p => p.includes(id) ? p.filter(f => f !== id) : [...p, id]); }
+  function setAnswer(fwId, qId, val) { setAnswers(p => ({ ...p, [fwId]: { ...(p[fwId]||{}), [qId]: val } })); }
 
   function validateProfile() {
-    const errors = {};
-    if (!profile.name.trim())     errors.name     = "Required";
-    if (!profile.company.trim())  errors.company  = "Required";
-    if (!profile.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email)) errors.email = "Valid email required";
-    if (!profile.industry)        errors.industry = "Required";
-    if (!profile.size)            errors.size     = "Required";
-    setPE(errors);
-    return Object.keys(errors).length === 0;
+    const e = {};
+    if (!profile.name.trim()) e.name = "Required";
+    if (!profile.company.trim()) e.company = "Required";
+    if (!profile.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email)) e.email = "Valid email required";
+    if (!profile.industry) e.industry = "Required";
+    if (!profile.size) e.size = "Required";
+    setPE(e);
+    return Object.keys(e).length === 0;
   }
 
   async function runAssessment() {
     setStep(3);
-    setAssessmentError("");
     scrollTop();
     const completed = {};
-    setLoadingMsg("Starting parallel analysis...");
+    const errors = [];
+    setLoadingMsg(`Starting assessment across ${selectedFWs.length} framework${selectedFWs.length>1?"s":""}…`);
 
-    await Promise.all(
-      selectedFrameworks.map(async (fwId) => {
-        const fw = FRAMEWORKS.find(f => f.id === fwId);
-        const fallbackReport = buildRuleBasedReport(fw, profile, answers[fwId] || {});
-        try {
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 45000);
-          // In dev: proxied via Vite (/api/claude -> api.anthropic.com)
-          // In prod: goes to /api/assess Vercel function
-          const isDev = import.meta.env.DEV;
-          const endpoint = isDev
-            ? "/api/claude"
-            : "/api/assess";
-          const body = isDev
-            ? JSON.stringify({
-                model: "claude-sonnet-4-6",
-                max_tokens: 4000,
-                system: buildSystemPrompt(fwId),
-                messages: [{ role: "user", content: buildUserPrompt(fw, profile, answers[fwId] || {}) }],
-              })
-            : JSON.stringify({
-                systemPrompt: buildSystemPrompt(fwId),
-                userPrompt: buildUserPrompt(fw, profile, answers[fwId] || {}),
-                profile,
-                frameworkName: fw.name,
-              });
-          const headers = isDev
-            ? {
-                "Content-Type": "application/json",
-                "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-              }
-            : { "Content-Type": "application/json" };
-          const res = await fetch(endpoint, {
-            method: "POST",
-            signal: controller.signal,
-            headers,
-            body,
-          });
-          clearTimeout(timeout);
-          const raw = await res.text();
-          const data = raw ? JSON.parse(raw) : {};
-          if (!res.ok) {
-            throw new Error(data?.detail || data?.error || `Request failed with status ${res.status}`);
-          }
-          // In prod the Vercel function wraps the report in { report: ... }
-          if (!isDev && data.report) {
-            completed[fwId] = data.report;
-            const doneCount = Object.keys(completed).length;
-            setLoadingMsg(`${doneCount} of ${selectedFrameworks.length} frameworks complete...`);
-            return;
-          }
-          const text = data.content?.[0]?.text || "{}";
-          const clean = text.replace(/```json|```/g, "").trim();
-          completed[fwId] = JSON.parse(clean);
-        } catch (err) {
-          setAssessmentError(prev => prev || err.message || "Assessment generation failed.");
-          completed[fwId] = fallbackReport;
+    await Promise.all(selectedFWs.map(async (fwId) => {
+      const fw = FRAMEWORKS.find(f => f.id === fwId);
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 58000);
+
+        const res = await fetch("/api/assess", {
+          method: "POST",
+          signal: controller.signal,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            frameworkId: fwId,
+            framework: {
+              name: fw.name,
+              questions: fw.questions,
+            },
+            profile,
+            answers: answers[fwId] || {},
+          }),
+        });
+
+        clearTimeout(timeout);
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+          console.error(`${fw.name} API error:`, errData);
+          errors.push(`${fw.name}: ${errData.error || `HTTP ${res.status}`}`);
+          completed[fwId] = null;
+          return;
         }
-        const doneCount = Object.keys(completed).length;
-        setLoadingMsg(`${doneCount} of ${selectedFrameworks.length} frameworks complete...`);
-      })
-    );
 
-    setLoadingMsg("Preparing your report...");
+        const data = await res.json();
+        if (data.report) {
+          completed[fwId] = data.report;
+        } else {
+          errors.push(`${fw.name}: No report returned`);
+          completed[fwId] = null;
+        }
 
-    // Save lead in background — never block the report from showing
-    saveLead(profile, selectedFrameworks, answers, completed).catch(() => {});
+      } catch (err) {
+        if (err.name === "AbortError") {
+          errors.push(`${fw.name}: Timed out after 58 seconds`);
+        } else {
+          errors.push(`${fw.name}: ${err.message}`);
+        }
+        completed[fwId] = null;
+      }
 
-    setReports(completed);
-    setAR(selectedFrameworks[0]);
+      const doneCount = Object.values(completed).filter(v => v !== undefined).length;
+      setLoadingMsg(`${doneCount} of ${selectedFWs.length} framework${selectedFWs.length>1?"s":""} complete…`);
+    }));
+
+    if (errors.length > 0) setLErrors(errors);
+
+    const successReports = Object.fromEntries(Object.entries(completed).filter(([,v]) => v !== null));
+    setReports(successReports);
+    const firstSuccess = selectedFWs.find(id => successReports[id]);
+    setAR(firstSuccess || selectedFWs[0]);
     setStep(4);
     scrollTop();
   }
 
-  const activeFWData = FRAMEWORKS.find(f => f.id === selectedFrameworks[currentFW]);
-  const activeAnswers = answers[selectedFrameworks[currentFW]] || {};
-  const allAnswered = activeFWData
-    ? activeFWData.questions.every(q => activeAnswers[q.id])
-    : false;
+  const activeFWData = FRAMEWORKS.find(f => f.id === selectedFWs[currentFW]);
+  const activeAnswers = answers[selectedFWs[currentFW]] || {};
+  const allAnswered = activeFWData ? activeFWData.questions.every(q => activeAnswers[q.id]) : false;
+  const isLastFW = currentFW === selectedFWs.length - 1;
 
-  // ── Step 0: Framework scope selector ────────────────────────────────────────
+  // ── Step 0: Framework selector ─────────────────────────────────────────────
   if (step === 0) return (
-    <div ref={topRef} style={{ fontFamily: "'DM Sans', system-ui, sans-serif", maxWidth: 860, margin: "0 auto", padding: "32px 20px" }}>
-      <div style={{ textAlign: "center", marginBottom: 32 }}>
-        <div style={{ display: "inline-block", background: MATTE_GOLD, color: "#fff", fontSize: 11, fontWeight: 700,
-          letterSpacing: "0.14em", textTransform: "uppercase", padding: "4px 14px", borderRadius: 20, marginBottom: 12 }}>
+    <div ref={topRef} style={{ fontFamily:"'Inter',sans-serif", maxWidth: 900, margin: "0 auto", padding: "40px 20px" }}>
+      <div style={{ textAlign: "center", marginBottom: 36 }}>
+        <div style={{ display:"inline-block", background: MATTE_GOLD, color:"#fff", fontSize:10, fontWeight:700, letterSpacing:"0.18em", textTransform:"uppercase", padding:"4px 16px", borderRadius:20, marginBottom:12 }}>
           Free Assessment
         </div>
-        <h1 style={{ fontSize: 28, fontWeight: 800, color: ROYAL_BLUE, margin: "0 0 10px" }}>
-          Know where you stand before the auditors arrive.
+        <h1 style={{ fontFamily:"'Montserrat',sans-serif", fontSize: 28, fontWeight: 900, color: ROYAL_BLUE, margin:"0 0 10px", textTransform:"uppercase" }}>
+          Know where you stand before they arrive.
         </h1>
-        <p style={{ fontSize: 15, color: "#6b7280", maxWidth: 560, margin: "0 auto" }}>
-          Select the frameworks relevant to your organisation. Your answers will generate a free, 
-          audit-grade gap analysis in under 2 minutes.
+        <p style={{ fontSize: 15, color: "#5C6070", maxWidth: 560, margin: "0 auto", fontFamily:"'Georgia',serif", fontStyle:"italic" }}>
+          Select the frameworks relevant to your organisation. Answer 12 targeted questions per framework and receive a free, AI-powered, audit-grade gap analysis.
         </p>
       </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 14, marginBottom: 28 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(240px,1fr))", gap:14, marginBottom:28 }}>
         {FRAMEWORKS.map(fw => {
-          const sel = selectedFrameworks.includes(fw.id);
+          const sel = selectedFWs.includes(fw.id);
           return (
-            <button key={fw.id} onClick={() => toggleFramework(fw.id)}
-              style={{ background: sel ? fw.color : "#fff", color: sel ? "#fff" : "#374151",
-                border: sel ? `2px solid ${fw.color}` : "2px solid #e5e7eb",
-                borderRadius: 12, padding: "16px 18px", cursor: "pointer", textAlign: "left",
-                transition: "all 0.15s ease" }}>
-              <div style={{ fontSize: 22, marginBottom: 6 }}>{fw.icon}</div>
-              <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 2 }}>{fw.name}</div>
-              <div style={{ fontSize: 12, opacity: sel ? 0.85 : 0.6 }}>{fw.subtitle}</div>
+            <button key={fw.id} onClick={() => toggleFW(fw.id)}
+              style={{ background: sel ? ROYAL_BLUE : "#fff", color: sel ? "#fff" : "#374151",
+                border: sel ? `2px solid ${ROYAL_BLUE}` : "2px solid #E8DFD0",
+                borderRadius: 8, padding:"16px 18px", cursor:"pointer", textAlign:"left",
+                transition:"all 0.15s", boxShadow: sel ? "0 4px 12px rgba(27,52,97,0.2)" : "0 1px 3px rgba(0,0,0,0.06)" }}>
+              <img src={fw.icon} alt={fw.name} style={{ width:44, height:44, objectFit:"cover", borderRadius:6, marginBottom:8 }}/>
+              <div style={{ fontSize:15, fontWeight:700, marginBottom:2, fontFamily:"'Montserrat',sans-serif" }}>{fw.name}</div>
+              <div style={{ fontSize:11, opacity: sel ? 0.8 : 0.55 }}>{fw.subtitle}</div>
+              <div style={{ fontSize:10, opacity: sel ? 0.7 : 0.45, marginTop:4 }}>{fw.description}</div>
             </button>
           );
         })}
       </div>
-
-      {selectedFrameworks.length > 0 && (
-        <div style={{ textAlign: "center" }}>
+      {selectedFWs.length > 0 && (
+        <div style={{ textAlign:"center" }}>
           <button onClick={() => { setStep(1); scrollTop(); }}
-            style={{ background: ROYAL_BLUE, color: "#fff", border: "none", borderRadius: 10,
-              padding: "14px 36px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
-            Continue with {selectedFrameworks.length} framework{selectedFrameworks.length > 1 ? "s" : ""} →
+            style={{ background: ROYAL_BLUE, color:"#fff", border:"none", borderRadius:6, padding:"13px 36px", fontSize:14, fontWeight:700, cursor:"pointer", letterSpacing:"0.05em" }}>
+            Continue with {selectedFWs.length} framework{selectedFWs.length>1?"s":""} →
           </button>
         </div>
       )}
     </div>
   );
 
-  // ── Step 1: Company profile ──────────────────────────────────────────────────
+  // ── Step 1: Profile ─────────────────────────────────────────────────────────
   if (step === 1) {
-    const field = (label, key, type = "text", opts = null) => (
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: ROYAL_BLUE, marginBottom: 6 }}>
-          {label} {["name","company","email","industry","size"].includes(key) && <span style={{ color: "#ef4444" }}>*</span>}
+    const field = (label, key, type="text", opts=null, req=true) => (
+      <div style={{ marginBottom:16 }}>
+        <label style={{ display:"block", fontSize:10, fontWeight:700, color: ROYAL_BLUE, letterSpacing:"0.2em", textTransform:"uppercase", marginBottom:6 }}>
+          {label}{req && <span style={{ color:"#ef4444" }}> *</span>}
         </label>
         {opts ? (
-          <select value={profile[key]} onChange={e => setProfile(p => ({ ...p, [key]: e.target.value }))}
-            style={{ width: "100%", padding: "10px 12px", border: `1px solid ${profileErrors[key] ? "#ef4444" : "#e5e7eb"}`,
-              borderRadius: 8, fontSize: 14, color: profile[key] ? "#111" : "#9ca3af" }}>
+          <select value={profile[key]} onChange={e => setProfile(p => ({...p, [key]: e.target.value}))}
+            style={{ width:"100%", padding:"10px 12px", border:`1px solid ${profileErrors[key]?"#ef4444":"#E8DFD0"}`, borderRadius:4, fontSize:13, color: profile[key]?"#0E1A26":"#9ca3af", background:"#fff" }}>
             <option value="">Select…</option>
             {opts.map(o => <option key={o}>{o}</option>)}
           </select>
         ) : (
-          <input type={type} value={profile[key]} onChange={e => setProfile(p => ({ ...p, [key]: e.target.value }))}
-            placeholder={key === "email" ? "your@company.com" : key === "phone" ? "+27 xx xxx xxxx (optional)" : ""}
-            style={{ width: "100%", padding: "10px 12px", border: `1px solid ${profileErrors[key] ? "#ef4444" : "#e5e7eb"}`,
-              borderRadius: 8, fontSize: 14, boxSizing: "border-box" }}/>
+          <input type={type} value={profile[key]} onChange={e => setProfile(p => ({...p, [key]: e.target.value}))}
+            style={{ width:"100%", padding:"10px 12px", border:`1px solid ${profileErrors[key]?"#ef4444":"#E8DFD0"}`, borderRadius:4, fontSize:13, boxSizing:"border-box" }}/>
         )}
-        {profileErrors[key] && <div style={{ fontSize: 12, color: "#ef4444", marginTop: 4 }}>{profileErrors[key]}</div>}
+        {profileErrors[key] && <div style={{ fontSize:11, color:"#ef4444", marginTop:3 }}>{profileErrors[key]}</div>}
       </div>
     );
-
     return (
-      <div ref={topRef} style={{ fontFamily: "'DM Sans', system-ui, sans-serif", maxWidth: 560, margin: "0 auto", padding: "32px 20px" }}>
-        <button onClick={() => setStep(0)} style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: 13, marginBottom: 20 }}>
-          ← Back
-        </button>
-        <h2 style={{ fontSize: 22, fontWeight: 700, color: ROYAL_BLUE, marginBottom: 6 }}>Your organisation</h2>
-        <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 24 }}>
-          Your report will be sent to your email. We'll also reach out with next steps.
+      <div ref={topRef} style={{ fontFamily:"'Inter',sans-serif", maxWidth: 560, margin:"0 auto", padding:"40px 20px" }}>
+        <button onClick={() => setStep(0)} style={{ background:"none", border:"none", color:"#9ca3af", cursor:"pointer", fontSize:12, marginBottom:20 }}>← Back</button>
+        <h2 style={{ fontFamily:"'Montserrat',sans-serif", fontSize:20, fontWeight:900, color: ROYAL_BLUE, textTransform:"uppercase", marginBottom:6 }}>Your Organisation</h2>
+        <p style={{ fontSize:13, color:"#5C6070", marginBottom:24, fontFamily:"'Georgia',serif", fontStyle:"italic" }}>
+          Your report will be generated immediately on screen and emailed to you for your records.
         </p>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"0 16px" }}>
           <div>{field("Your name", "name")}</div>
           <div>{field("Company name", "company")}</div>
         </div>
         {field("Work email", "email", "email")}
-        {field("Phone number", "phone", "tel")}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}>
+        {field("Phone number", "phone", "tel", null, false)}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"0 16px" }}>
           <div>{field("Industry", "industry", "text", INDUSTRY_OPTIONS)}</div>
           <div>{field("Company size", "size", "text", SIZE_OPTIONS)}</div>
         </div>
-
-        <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#0369a1", marginBottom: 20 }}>
-          🔒 Your data is stored securely and never shared. This assessment is for your benefit only.
+        <div style={{ background:"#F0F9FF", border:"1px solid #BAE6FD", borderRadius:4, padding:"10px 14px", fontSize:11, color:"#0369A1", marginBottom:20 }}>
+          🔒 Your information is used solely to generate and deliver your assessment report. We do not sell or share your data.
         </div>
-
         <button onClick={() => { if (validateProfile()) { setStep(2); scrollTop(); } }}
-          style={{ width: "100%", background: ROYAL_BLUE, color: "#fff", border: "none", borderRadius: 10,
-            padding: "14px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
+          style={{ width:"100%", background: ROYAL_BLUE, color:"#fff", border:"none", borderRadius:6, padding:"13px", fontSize:14, fontWeight:700, cursor:"pointer" }}>
           Start Assessment →
         </button>
       </div>
     );
   }
 
-  // ── Step 2: Questions ────────────────────────────────────────────────────────
+  // ── Step 2: Questions ───────────────────────────────────────────────────────
   if (step === 2 && activeFWData) {
     const progress = Math.round((Object.keys(activeAnswers).length / activeFWData.questions.length) * 100);
-    const isLastFW = currentFW === selectedFrameworks.length - 1;
-
     return (
-      <div ref={topRef} style={{ fontFamily: "'DM Sans', system-ui, sans-serif", maxWidth: 700, margin: "0 auto", padding: "32px 20px" }}>
-        <button onClick={() => currentFW === 0 ? setStep(1) : setCurrentFW(c => c - 1)}
-          style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: 13, marginBottom: 16 }}>
-          ← Back
-        </button>
-
-        {/* FW progress pills */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-          {selectedFrameworks.map((fwId, i) => {
+      <div ref={topRef} style={{ fontFamily:"'Inter',sans-serif", maxWidth: 720, margin:"0 auto", padding:"32px 20px" }}>
+        <button onClick={() => currentFW === 0 ? setStep(1) : setCurrentFW(c => c-1)}
+          style={{ background:"none", border:"none", color:"#9ca3af", cursor:"pointer", fontSize:12, marginBottom:16 }}>← Back</button>
+        <div style={{ display:"flex", gap:8, marginBottom:20, flexWrap:"wrap" }}>
+          {selectedFWs.map((fwId,i) => {
             const fw = FRAMEWORKS.find(f => f.id === fwId);
             const done = i < currentFW;
             const active = i === currentFW;
             return (
-              <span key={fwId} style={{ padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600,
-                background: done ? "#dcfce7" : active ? ROYAL_BLUE : "#f3f4f6",
-                color: done ? "#166534" : active ? "#fff" : "#9ca3af" }}>
+              <span key={fwId} style={{ padding:"4px 12px", borderRadius:20, fontSize:11, fontWeight:600,
+                background: done?"#dcfce7":active?ROYAL_BLUE:"#f3f4f6",
+                color: done?"#166534":active?"#fff":"#9ca3af" }}>
                 {done ? "✓ " : ""}{fw.name}
               </span>
             );
           })}
         </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-          <span style={{ fontSize: 24 }}>{activeFWData.icon}</span>
+        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:8 }}>
+          <img src={activeFWData.icon} alt={activeFWData.name} style={{ width:36, height:36, objectFit:"cover", borderRadius:4 }}/>
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, color: ROYAL_BLUE, margin: 0 }}>{activeFWData.name}</h2>
-            <div style={{ fontSize: 13, color: "#6b7280" }}>{activeFWData.description}</div>
+            <h2 style={{ fontFamily:"'Montserrat',sans-serif", fontSize:18, fontWeight:900, color: ROYAL_BLUE, margin:0, textTransform:"uppercase" }}>{activeFWData.name}</h2>
+            <div style={{ fontSize:12, color:"#5C6070" }}>{activeFWData.description}</div>
           </div>
         </div>
-
-        {/* Progress bar */}
-        <div style={{ height: 4, background: "#f3f4f6", borderRadius: 2, marginBottom: 24 }}>
-          <div style={{ height: "100%", background: MATTE_GOLD, borderRadius: 2, width: `${progress}%`, transition: "width 0.3s" }}/>
+        <div style={{ height:4, background:"#E8DFD0", borderRadius:2, marginBottom:24 }}>
+          <div style={{ height:"100%", background: MATTE_GOLD, borderRadius:2, width:`${progress}%`, transition:"width 0.3s" }}/>
         </div>
-
         {activeFWData.questions.map((q, qi) => (
-          <div key={q.id} style={{ marginBottom: 20, padding: "16px 18px", background: "#fff",
-            border: "1px solid #e5e7eb", borderRadius: 10 }}>
-            <div style={{ fontSize: 14, color: "#374151", fontWeight: 500, marginBottom: 12, lineHeight: 1.5 }}>
-              <span style={{ color: MATTE_GOLD, fontWeight: 700 }}>Q{qi + 1}. </span>{q.text}
+          <div key={q.id} style={{ marginBottom:18, padding:"16px 18px", background:"#fff", border:"1px solid #E8DFD0", borderRadius:8 }}>
+            <div style={{ fontSize:13, color:"#2C3240", fontWeight:500, marginBottom:12, lineHeight:1.6 }}>
+              <span style={{ color: MATTE_GOLD, fontWeight:700 }}>Q{qi+1}. </span>{q.text}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:8 }}>
               {ANSWER_OPTIONS.map(opt => {
                 const sel = activeAnswers[q.id] === opt.value;
                 return (
-                  <button key={opt.value} onClick={() => setAnswer(selectedFrameworks[currentFW], q.id, opt.value)}
-                    style={{ background: sel ? opt.bg : "#f9fafb", color: sel ? opt.color : "#374151",
-                      border: sel ? `2px solid ${opt.color}` : "2px solid #e5e7eb",
-                      borderRadius: 8, padding: "8px 12px", cursor: "pointer", fontSize: 12,
-                      fontWeight: sel ? 700 : 400, textAlign: "left", transition: "all 0.1s" }}>
+                  <button key={opt.value} onClick={() => setAnswer(selectedFWs[currentFW], q.id, opt.value)}
+                    style={{ background: sel?opt.bg:"#F8F5F0", color: sel?opt.color:"#374151",
+                      border: sel?`2px solid ${opt.color}`:"2px solid #E8DFD0",
+                      borderRadius:6, padding:"8px 12px", cursor:"pointer", fontSize:12,
+                      fontWeight: sel?700:400, textAlign:"left", transition:"all 0.1s" }}>
                     {opt.label}
                   </button>
                 );
@@ -1057,192 +908,175 @@ export default function AssessmentTool() {
             </div>
           </div>
         ))}
-
         <button onClick={() => {
           if (!allAnswered) return;
           if (isLastFW) { runAssessment(); }
-          else { setCurrentFW(c => c + 1); scrollTop(); }
+          else { setCurrentFW(c => c+1); scrollTop(); }
         }}
           disabled={!allAnswered}
-          style={{ width: "100%", background: allAnswered ? ROYAL_BLUE : "#e5e7eb",
-            color: allAnswered ? "#fff" : "#9ca3af", border: "none", borderRadius: 10,
-            padding: "14px", fontSize: 15, fontWeight: 700, cursor: allAnswered ? "pointer" : "not-allowed" }}>
-          {isLastFW ? "Generate My Report →" : `Next: ${FRAMEWORKS.find(f => f.id === selectedFrameworks[currentFW + 1])?.name} →`}
+          style={{ width:"100%", background: allAnswered?ROYAL_BLUE:"#E8DFD0", color: allAnswered?"#fff":"#9ca3af",
+            border:"none", borderRadius:6, padding:"13px", fontSize:14, fontWeight:700, cursor: allAnswered?"pointer":"not-allowed" }}>
+          {isLastFW ? "Generate My Report →" : `Next: ${FRAMEWORKS.find(f=>f.id===selectedFWs[currentFW+1])?.name} →`}
         </button>
       </div>
     );
   }
 
-  // ── Step 3: Loading ──────────────────────────────────────────────────────────
+  // ── Step 3: Loading ─────────────────────────────────────────────────────────
   if (step === 3) {
-    const doneCount = parseInt(loadingMsg?.match(/^(\d+) of/)?.[1] || "0");
-    const total = selectedFrameworks.length;
-    const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+    const doneCount = parseInt(loadingMsg?.match(/^(\d+) of/)?.[1]||"0");
+    const total = selectedFWs.length;
+    const pct = total > 0 ? Math.round((doneCount/total)*100) : 5;
     return (
-      <div ref={topRef} style={{ fontFamily: "'DM Sans', system-ui, sans-serif", maxWidth: 560, margin: "0 auto",
-        padding: "80px 20px", textAlign: "center" }}>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        <div style={{ width: 56, height: 56, border: "4px solid #e5e7eb", borderTop: `4px solid ${ROYAL_BLUE}`,
-          borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 24px" }}/>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: ROYAL_BLUE, marginBottom: 8 }}>
-          Analysing your controls...
+      <div ref={topRef} style={{ fontFamily:"'Inter',sans-serif", maxWidth:560, margin:"0 auto", padding:"80px 20px", textAlign:"center" }}>
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        <div style={{ width:56, height:56, border:"4px solid #E8DFD0", borderTop:`4px solid ${ROYAL_BLUE}`,
+          borderRadius:"50%", animation:"spin 0.8s linear infinite", margin:"0 auto 24px" }}/>
+        <h2 style={{ fontFamily:"'Montserrat',sans-serif", fontSize:18, fontWeight:900, color: ROYAL_BLUE, textTransform:"uppercase", marginBottom:8 }}>
+          Analysing Your Controls
         </h2>
-        <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 28 }}>{loadingMsg}</p>
-
-        {assessmentError && (
-          <div style={{
-            background: "#fff7ed",
-            border: "1px solid #fdba74",
-            color: "#9a3412",
-            borderRadius: 10,
-            padding: "12px 14px",
-            fontSize: 13,
-            marginBottom: 20,
-          }}>
-            {assessmentError}
-          </div>
-        )}
-
-        {/* Progress bar */}
-        <div style={{ background: "#f3f4f6", borderRadius: 4, height: 6, marginBottom: 20, overflow: "hidden" }}>
-          <div style={{ height: "100%", background: ROYAL_BLUE, borderRadius: 4,
-            width: `${pct}%`, transition: "width 0.5s ease" }}/>
+        <p style={{ fontSize:13, color:"#5C6070", marginBottom:24 }}>{loadingMsg}</p>
+        <div style={{ background:"#E8DFD0", borderRadius:4, height:6, marginBottom:20, overflow:"hidden" }}>
+          <div style={{ height:"100%", background: ROYAL_BLUE, borderRadius:4, width:`${pct}%`, transition:"width 0.5s ease" }}/>
         </div>
-
-        {/* Per-framework status pills */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 28 }}>
-          {selectedFrameworks.map((fwId, i) => {
-            const fw = FRAMEWORKS.find(f => f.id === fwId);
-            const done = reports[fwId] !== undefined || (doneCount > i);
+        <div style={{ display:"flex", flexWrap:"wrap", gap:8, justifyContent:"center", marginBottom:24 }}>
+          {selectedFWs.map((fwId,i) => {
+            const fw = FRAMEWORKS.find(f=>f.id===fwId);
+            const done = i < doneCount;
             return (
-              <span key={fwId} style={{
-                padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600,
-                background: done ? "#dcfce7" : "#f3f4f6",
-                color: done ? "#166534" : "#9ca3af",
-                border: `1px solid ${done ? "#bbf7d0" : "#e5e7eb"}`
-              }}>
-                {done ? "✓ " : ""}{fw.name}
+              <span key={fwId} style={{ padding:"4px 12px", borderRadius:20, fontSize:11, fontWeight:600,
+                background: done?"#dcfce7":"#f3f4f6", color: done?"#166534":"#9ca3af",
+                border:`1px solid ${done?"#bbf7d0":"#e5e7eb"}` }}>
+                {done?"✓ ":""}{fw?.name}
               </span>
             );
           })}
         </div>
-
-        <p style={{ fontSize: 12, color: "#9ca3af" }}>
-          All frameworks are being analysed in parallel.<br/>
-          {total > 3 ? "With " + total + " frameworks this takes about 30–45 seconds." : "This takes about 20–30 seconds."}
+        <p style={{ fontSize:11, color:"#9ca3af", fontStyle:"italic" }}>
+          Your responses are being assessed against audit-grade framework controls by AI sub-agents.<br/>
+          {total > 2 ? `With ${total} frameworks this takes about 30–45 seconds.` : "This takes about 20–30 seconds."}
         </p>
       </div>
     );
   }
 
-  // ── Step 4: Results ──────────────────────────────────────────────────────────
+  // ── Step 4: Results ─────────────────────────────────────────────────────────
   if (step === 4) {
     const activeReportData = reports[activeReport];
     return (
-      <div ref={topRef} style={{ fontFamily: "'DM Sans', system-ui, sans-serif", maxWidth: 860, margin: "0 auto", padding: "24px 20px" }}>
-
-        {/* Results header */}
-        <div style={{ background: ROYAL_BLUE, borderRadius: 14, padding: "24px 28px", marginBottom: 24, display: "flex",
-          alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+      <div ref={topRef} style={{ fontFamily:"'Inter',sans-serif", maxWidth:880, margin:"0 auto", padding:"24px 20px" }}>
+        {/* Header */}
+        <div style={{ background: ROYAL_BLUE, borderRadius:10, padding:"22px 26px", marginBottom:20,
+          display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:16, flexWrap:"wrap" }}>
           <div>
-            <div style={{ color: LIGHT_GOLD, fontSize: 11, fontWeight: 700, letterSpacing: "0.12em",
-              textTransform: "uppercase", marginBottom: 6 }}>
+            <div style={{ color: GOLD_LIGHT, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:5 }}>
               ARCReady Assessment Complete
             </div>
-            <div style={{ color: "#fff", fontSize: 22, fontWeight: 800, marginBottom: 4 }}>
+            <div style={{ color:"#fff", fontSize:20, fontWeight:800, marginBottom:4 }}>
               {profile.company} — Control Self-Assessment
             </div>
-            <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 13 }}>
-              {new Date().toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })} · {selectedFrameworks.length} framework{selectedFrameworks.length > 1 ? "s" : ""} assessed
+            <div style={{ color:"rgba(255,255,255,0.55)", fontSize:12 }}>
+              {new Date().toLocaleDateString("en-ZA",{day:"numeric",month:"long",year:"numeric"})} · {selectedFWs.length} framework{selectedFWs.length>1?"s":""} assessed
             </div>
           </div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
             <button onClick={() => window.print()}
-              style={{ background: "rgba(255,255,255,0.12)", color: "#fff", border: "1px solid rgba(255,255,255,0.25)",
-                borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              style={{ background:"rgba(255,255,255,0.1)", color:"#fff", border:"1px solid rgba(255,255,255,0.25)",
+                borderRadius:6, padding:"8px 16px", fontSize:12, fontWeight:600, cursor:"pointer" }}>
               Print / Save PDF
+            </button>
+            <button
+              onClick={async () => {
+                setPDF(true);
+                try { await generatePDF(profile, reports, selectedFWs); }
+                catch(e) { console.error("PDF error:", e); alert("PDF generation failed. Please use Print / Save PDF instead."); }
+                finally { setPDF(false); }
+              }}
+              disabled={pdfGenerating}
+              style={{ background: MATTE_GOLD, color:"#fff", border:"none",
+                borderRadius:6, padding:"8px 16px", fontSize:12, fontWeight:700, cursor: pdfGenerating?"not-allowed":"pointer", opacity: pdfGenerating?0.7:1 }}>
+              {pdfGenerating ? "Generating…" : "⬇ Download PDF Report"}
             </button>
           </div>
         </div>
 
+        {/* Error notice */}
+        {loadingErrors.length > 0 && (
+          <div style={{ background:"#fef3c7", border:"1px solid #fcd34d", borderRadius:6, padding:"12px 16px", marginBottom:16, fontSize:12, color:"#92400e" }}>
+            <strong>Note:</strong> Some frameworks could not be assessed:
+            <ul style={{ margin:"6px 0 0 16px" }}>{loadingErrors.map((e,i) => <li key={i}>{e}</li>)}</ul>
+            Please check that your Anthropic API key is correctly set in Vercel Environment Variables (Settings → Environment Variables → ANTHROPIC_API_KEY).
+          </div>
+        )}
+
         {/* Booking CTA */}
-        <div style={{ background: `linear-gradient(135deg, ${MATTE_GOLD}22, ${MATTE_GOLD}11)`,
-          border: `2px solid ${MATTE_GOLD}`, borderRadius: 12, padding: "20px 24px", marginBottom: 24,
-          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <div style={{ background:"#fff8ec", border:`2px solid ${MATTE_GOLD}`, borderRadius:8, padding:"18px 22px", marginBottom:20,
+          display:"flex", alignItems:"center", justifyContent:"space-between", gap:16, flexWrap:"wrap" }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: ROYAL_BLUE, marginBottom: 4 }}>
+            <div style={{ fontSize:14, fontWeight:700, color: ROYAL_BLUE, marginBottom:4, fontFamily:"'Montserrat',sans-serif" }}>
               Ready to turn these findings into action?
             </div>
-            <div style={{ fontSize: 13, color: "#6b7280", maxWidth: 480 }}>
-              Book a free 30-minute consultation with Michael Mokadi CA(SA) to walk through your results 
-              and build a prioritised remediation roadmap.
+            <div style={{ fontSize:12, color:"#5C6070", maxWidth:480 }}>
+              Book a free 30-minute consultation with Michael Mokadi CA(SA) to walk through your results and build a prioritised remediation roadmap.
             </div>
           </div>
           <a href="https://www.arcready.co.za/#contact"
-            style={{ background: MATTE_GOLD, color: "#fff", textDecoration: "none",
-              borderRadius: 10, padding: "12px 24px", fontSize: 14, fontWeight: 700,
-              whiteSpace: "nowrap", display: "inline-block" }}>
+            style={{ background: MATTE_GOLD, color:"#fff", textDecoration:"none", borderRadius:6, padding:"11px 22px",
+              fontSize:12, fontWeight:700, whiteSpace:"nowrap", display:"inline-block", letterSpacing:"0.05em" }}>
             Book Free Consultation →
           </a>
         </div>
 
-        {assessmentError && (
-          <div style={{
-            background: "#fff7ed",
-            border: "1px solid #fdba74",
-            color: "#9a3412",
-            borderRadius: 10,
-            padding: "12px 16px",
-            fontSize: 13,
-            marginBottom: 20,
-          }}>
-            AI enhancement is currently unavailable, so this report was generated directly from your framework responses.
-          </div>
-        )}
-
-        {/* Framework tabs (if multiple) */}
-        {selectedFrameworks.length > 1 && (
-          <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-            {selectedFrameworks.map(fwId => {
-              const fw = FRAMEWORKS.find(f => f.id === fwId);
-              const r  = reports[fwId];
+        {/* Framework tabs */}
+        {selectedFWs.length > 1 && (
+          <div style={{ display:"flex", gap:8, marginBottom:18, flexWrap:"wrap" }}>
+            {selectedFWs.map(fwId => {
+              const fw = FRAMEWORKS.find(f=>f.id===fwId);
+              const r = reports[fwId];
               const active = activeReport === fwId;
-              const rColor = { "High Risk": "#991b1b", "Medium Risk": "#92400e", "Low Risk": "#166534" }[r?.overallRating] || "#374151";
+              const rColor = {
+                "High Risk":"#991b1b","Medium Risk":"#92400e","Low Risk":"#166534"
+              }[r?.overallRating]||"#374151";
               return (
                 <button key={fwId} onClick={() => setAR(fwId)}
-                  style={{ background: active ? ROYAL_BLUE : "#fff", color: active ? "#fff" : "#374151",
-                    border: `2px solid ${active ? ROYAL_BLUE : "#e5e7eb"}`, borderRadius: 10,
-                    padding: "8px 16px", cursor: "pointer", fontSize: 13, fontWeight: 600,
-                    display: "flex", alignItems: "center", gap: 8 }}>
-                  {fw.icon} {fw.name}
+                  style={{ background: active?ROYAL_BLUE:"#fff", color: active?"#fff":"#374151",
+                    border:`2px solid ${active?ROYAL_BLUE:"#E8DFD0"}`, borderRadius:8,
+                    padding:"7px 14px", cursor:"pointer", fontSize:12, fontWeight:600,
+                    display:"flex", alignItems:"center", gap:6, opacity: r?1:0.5 }}>
+                  <img src={fw?.icon} alt={fw?.name} style={{ width:20, height:20, objectFit:"cover", borderRadius:3 }}/> {fw?.name}
                   {r && (
-                    <span style={{ background: active ? "rgba(255,255,255,0.2)" : rColor + "22",
-                      color: active ? "#fff" : rColor, padding: "1px 6px", borderRadius: 4, fontSize: 11 }}>
+                    <span style={{ background: active?"rgba(255,255,255,0.2)":rColor+"22",
+                      color: active?"#fff":rColor, padding:"1px 6px", borderRadius:4, fontSize:10 }}>
                       {r.overallScore}
                     </span>
                   )}
+                  {!r && <span style={{ fontSize:10, color:"#9ca3af" }}>(failed)</span>}
                 </button>
               );
             })}
           </div>
         )}
 
-        {/* Active report */}
-        {activeReportData && (
-          <ReportCard
-            report={activeReportData}
-            framework={FRAMEWORKS.find(f => f.id === activeReport)}
-          />
+        {/* Report */}
+        {activeReportData ? (
+          <ReportCard report={activeReportData} framework={FRAMEWORKS.find(f=>f.id===activeReport)}/>
+        ) : (
+          <div style={{ background:"#fff", border:"1px solid #E8DFD0", borderRadius:8, padding:"32px", textAlign:"center" }}>
+            <div style={{ fontSize:14, color:"#5C6070" }}>
+              Assessment for this framework could not be completed.<br/>
+              <span style={{ fontSize:12, color:"#9ca3af" }}>Please check your API key configuration and try again.</span>
+            </div>
+          </div>
         )}
 
-        {/* Next step nudge */}
+        {/* Next step */}
         {activeReportData?.nextStep && (
-          <div style={{ background: OFF_WHITE, border: `1px solid ${MATTE_GOLD}44`, borderRadius: 10,
-            padding: "16px 20px", display: "flex", gap: 12, alignItems: "flex-start" }}>
-            <span style={{ fontSize: 20 }}>💡</span>
+          <div style={{ background: OFF_WHITE, border:`1px solid ${MATTE_GOLD}44`, borderRadius:8,
+            padding:"14px 18px", display:"flex", gap:10, alignItems:"flex-start", marginTop:8 }}>
+            <span style={{ fontSize:18 }}>💡</span>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: ROYAL_BLUE, marginBottom: 4 }}>ARCReady recommends</div>
-              <div style={{ fontSize: 13, color: "#374151" }}>{activeReportData.nextStep}</div>
+              <div style={{ fontSize:12, fontWeight:700, color: ROYAL_BLUE, marginBottom:3 }}>ARCReady recommends</div>
+              <div style={{ fontSize:13, color:"#374151" }}>{activeReportData.nextStep}</div>
             </div>
           </div>
         )}
