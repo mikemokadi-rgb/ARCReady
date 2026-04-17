@@ -1,8 +1,8 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Navbar } from './Components/Navbar';
 import { Footer } from './Components/Footer';
-import { HomePage } from './Pages/HomePage';
-import { AssessmentPage } from './Pages/AssessmentPage';
+import { HomePage } from './pages/HomePage';
+import { AssessmentPage } from './pages/AssessmentPage';
 
 export default function App() {
   return (
