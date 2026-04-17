@@ -148,7 +148,6 @@ const FRAMEWORKS = [
       { id: "q12", text: "Where consent is the lawful basis for processing, are consent mechanisms compliant, documented, and withdrawal processes operational?" },
     ],
   },
-  ,
   {
     id: "coso",
     name: "COSO",
