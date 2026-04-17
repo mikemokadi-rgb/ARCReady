@@ -382,6 +382,33 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Failed to reach Anthropic API", detail: err.message });
   }
 
+  // ── Save lead to Supabase (non-blocking) ─────────────────────────────────
+  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (supabaseUrl && supabaseKey && report) {
+    fetch(`${supabaseUrl}/rest/v1/assessment_leads`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${supabaseKey}`,
+        "Prefer": "return=minimal",
+      },
+      body: JSON.stringify({
+        name: profile.name,
+        company: profile.company,
+        email: profile.email,
+        phone: profile.phone || null,
+        industry: profile.industry,
+        size: profile.size,
+        frameworks: [frameworkId],
+        answers: answers,
+        report: report,
+      }),
+    }).catch(err => console.error("Supabase save error:", err));
+  }
+
   // ── Send emails (non-blocking — never delay the response) ─────────────────
   if (process.env.RESEND_API_KEY && report) {
     const prospectEmail = buildProspectEmail(profile, framework.name, report);
