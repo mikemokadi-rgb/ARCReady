@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ARCLogo } from '../Components/ARCLogo';
-import { useReveal } from '../Hooks/useReveal';
+import { ARCLogo } from '../components/ARCLogo';
+import { useReveal } from '../hooks/useReveal';
 
 export function HomePage() {
   useReveal();
@@ -176,7 +176,7 @@ export function HomePage() {
                   ))}
                 </div>
                 <div className="svc-callout"><p className="svc-callout-text">Best entry point to understand where you stand before committing to a deeper review.</p></div>
-                <a href="#contact" className="btn btn-outline">Get Started &nbsp;→</a>
+                <Link to="/assessment" className="btn btn-gold">Free Assessment &nbsp;→</Link>
               </div>
             </div>
 
