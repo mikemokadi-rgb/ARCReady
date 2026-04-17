@@ -55,9 +55,11 @@ export function Navbar() {
               <li><Link to="/assessment" style={{ color: 'var(--gold-light)' }}>Free Assessment</Link></li>
             </ul>
 
-            <button className="nav-cta-btn" onClick={() => { setMobile(false); scrollTo('contact'); }}>
+            <a href="https://calendly.com/michael-arcready/30min"
+               target="_blank" rel="noopener noreferrer"
+               className="nav-cta-btn">
               Book a Call
-            </button>
+            </a>
             <button className="hamburger" onClick={() => setMobile(o => !o)} aria-label="Menu">
               <span /><span /><span />
             </button>

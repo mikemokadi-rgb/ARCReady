@@ -6,6 +6,7 @@ import { useReveal } from '../hooks/useReveal';
 export function HomePage() {
   useReveal();
   const [formStatus, setFormStatus] = useState('idle');
+  const [contactTab, setContactTab] = useState('calendar');
 
   useEffect(() => {
     // scroll progress bar
@@ -325,7 +326,7 @@ export function HomePage() {
               <p className="contact-sub reveal">Whether you have a specific engagement in mind or just want to understand your options, we're happy to have a no-obligation conversation.</p>
               <div className="contact-options">
                 {[
-                  { icon: <><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>, title:'Book a Free Discovery Call', text:"Schedule a 30-minute call at a time that suits you. No obligation, no jargon — just clarity.", link:null, linkText:'Schedule a Call →', d:'d1' },
+                  { icon: <><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>, title:'Book a Free Discovery Call', text:"Schedule a 30-minute call at a time that suits you. No obligation, no jargon — just clarity.", link:null, linkText:'Schedule a Call →', action: () => setContactTab('calendar'), d:'d1' },
                   { icon: <><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></>, title:'Send a Message', text:"Prefer email? Reach out directly and we'll respond within one business day.", link:'mailto:hello@arcready.co.za', linkText:'hello@arcready.co.za', d:'d2' },
                   { icon: <><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></>, title:'Global Reach', text:'ARCReady works with organisations across multiple jurisdictions, delivering remote and on-site engagements worldwide.', link:null, linkText:null, d:'d3' },
                 ].map(o => (
@@ -337,7 +338,7 @@ export function HomePage() {
                       <div className="co-title">{o.title}</div>
                       <p className="co-text">{o.text}</p>
                       {o.link && <a href={o.link} className="co-link">{o.linkText}</a>}
-                      {!o.link && o.linkText && <span className="co-link">{o.linkText}</span>}
+                      {!o.link && o.linkText && <button onClick={o.action || undefined} className="co-link" style={{background:'none',border:'none',cursor:o.action?'pointer':'default',padding:0}}>{o.linkText}</button>}
                     </div>
                   </div>
                 ))}
@@ -345,33 +346,111 @@ export function HomePage() {
             </div>
 
             <div className="reveal">
-              <div className="form-wrap">
-                <div className="form-title">Send a Message</div>
-                <form onSubmit={handleSubmit}>
-                  <div className="form-grid">
-                    <div className="fg"><label className="fl">Name *</label><input className="fi" type="text" placeholder="Your full name" required/></div>
-                    <div className="fg"><label className="fl">Company</label><input className="fi" type="text" placeholder="Organisation name"/></div>
-                    <div className="fg"><label className="fl">Email *</label><input className="fi" type="email" placeholder="you@company.com" required/></div>
-                    <div className="fg"><label className="fl">Phone</label><input className="fi" type="tel" placeholder="+27 ..."/></div>
-                    <div className="fg full">
-                      <label className="fl">What are you looking for?</label>
-                      <select className="fs">
-                        <option value="">Select an option</option>
-                        <option>General Enquiry</option>
-                        <option>Book Assessment</option>
-                        <option>Partnership</option>
-                        <option>Other</option>
-                      </select>
+              {/* Tab switcher */}
+              <div style={{display:'flex', marginBottom:0, borderBottom:'1px solid rgba(176,144,80,0.2)'}}>
+                <button
+                  onClick={() => setContactTab('calendar')}
+                  style={{
+                    flex:1, padding:'12px 0', background:'none', border:'none', cursor:'pointer',
+                    fontFamily:"'Inter',sans-serif", fontSize:10, fontWeight:600, letterSpacing:'0.22em',
+                    textTransform:'uppercase',
+                    color: contactTab === 'calendar' ? 'var(--gold-light)' : 'rgba(255,255,255,0.35)',
+                    borderBottom: contactTab === 'calendar' ? '2px solid var(--gold)' : '2px solid transparent',
+                    marginBottom:-1, transition:'color 0.2s'
+                  }}>
+                  📅 Book a Call
+                </button>
+                <button
+                  onClick={() => setContactTab('message')}
+                  style={{
+                    flex:1, padding:'12px 0', background:'none', border:'none', cursor:'pointer',
+                    fontFamily:"'Inter',sans-serif", fontSize:10, fontWeight:600, letterSpacing:'0.22em',
+                    textTransform:'uppercase',
+                    color: contactTab === 'message' ? 'var(--gold-light)' : 'rgba(255,255,255,0.35)',
+                    borderBottom: contactTab === 'message' ? '2px solid var(--gold)' : '2px solid transparent',
+                    marginBottom:-1, transition:'color 0.2s'
+                  }}>
+                  ✉ Send a Message
+                </button>
+              </div>
+
+              {/* Calendly tab */}
+              {contactTab === 'calendar' && (
+                <div style={{
+                  background:'rgba(255,255,255,0.03)',
+                  border:'1px solid rgba(176,144,80,0.12)',
+                  borderTop:'none',
+                  padding:'8px',
+                  minHeight:620
+                }}>
+                  {/* Branded header strip */}
+                  <div style={{
+                    background:'var(--royal-deep)',
+                    borderBottom:'1px solid rgba(176,144,80,0.2)',
+                    padding:'14px 20px',
+                    display:'flex', alignItems:'center', gap:12,
+                    marginBottom:0
+                  }}>
+                    <div style={{
+                      width:36, height:36, background:'var(--royal)',
+                      border:'1px solid rgba(176,144,80,0.3)',
+                      borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+                      flexShrink:0
+                    }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#BFA06A" strokeWidth="1.5" strokeLinecap="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                      </svg>
                     </div>
-                    <div className="fg full"><label className="fl">Message</label><textarea className="ft" placeholder="Tell us about your situation or what you're looking for..."/></div>
-                    <div className="fg full" style={{marginTop:4}}>
-                      <button type="submit" className="btn btn-gold" style={{width:'100%',justifyContent:'center', background: formStatus === 'sent' ? 'var(--gold-muted)' : '', pointerEvents: formStatus === 'sent' ? 'none' : ''}}>
-                        {formStatus === 'sent' ? 'Message Sent ✓' : 'Send Message'}
-                      </button>
+                    <div>
+                      <div style={{fontFamily:"'Montserrat',sans-serif", fontSize:13, fontWeight:700, color:'#fff', letterSpacing:'0.04em'}}>
+                        Book a Free Discovery Call
+                      </div>
+                      <div style={{fontFamily:"'Inter',sans-serif", fontSize:11, color:'rgba(255,255,255,0.45)', marginTop:2}}>
+                        30 minutes · Michael Mokadi CA(SA) · ARCReady
+                      </div>
                     </div>
                   </div>
-                </form>
-              </div>
+                  <iframe
+                    src="https://calendly.com/michael-arcready/30min?hide_gdpr_banner=1&primary_color=a4844a&text_color=0e1a26&background_color=f3ede2"
+                    width="100%"
+                    height="580"
+                    frameBorder="0"
+                    title="Book a Discovery Call with ARCReady"
+                    style={{display:'block', border:'none'}}
+                  />
+                </div>
+              )}
+
+              {/* Message tab */}
+              {contactTab === 'message' && (
+                <div className="form-wrap" style={{borderTop:'none'}}>
+                  <div className="form-title">Send a Message</div>
+                  <form onSubmit={handleSubmit}>
+                    <div className="form-grid">
+                      <div className="fg"><label className="fl">Name *</label><input className="fi" type="text" placeholder="Your full name" required/></div>
+                      <div className="fg"><label className="fl">Company</label><input className="fi" type="text" placeholder="Organisation name"/></div>
+                      <div className="fg"><label className="fl">Email *</label><input className="fi" type="email" placeholder="you@company.com" required/></div>
+                      <div className="fg"><label className="fl">Phone</label><input className="fi" type="tel" placeholder="+27 ..."/></div>
+                      <div className="fg full">
+                        <label className="fl">What are you looking for?</label>
+                        <select className="fs">
+                          <option value="">Select an option</option>
+                          <option>General Enquiry</option>
+                          <option>Book Assessment</option>
+                          <option>Partnership</option>
+                          <option>Other</option>
+                        </select>
+                      </div>
+                      <div className="fg full"><label className="fl">Message</label><textarea className="ft" placeholder="Tell us about your situation or what you're looking for..."/></div>
+                      <div className="fg full" style={{marginTop:4}}>
+                        <button type="submit" className="btn btn-gold" style={{width:'100%',justifyContent:'center', background: formStatus === 'sent' ? 'var(--gold-muted)' : '', pointerEvents: formStatus === 'sent' ? 'none' : ''}}>
+                          {formStatus === 'sent' ? 'Message Sent ✓' : 'Send Message'}
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              )}
             </div>
           </div>
         </div>
